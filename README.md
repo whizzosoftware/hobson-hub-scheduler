@@ -10,7 +10,7 @@
 To find out more and download ready-to-run installers, please visit the 
 [Hobson website](http://www.hobson-automation.com).
 
-### hobson-hub-api
+### hobson-hub-scheduler
 
 The Scheduler plugin provides a way to create triggers based on timed events including 
 complex recurrence patterns.
