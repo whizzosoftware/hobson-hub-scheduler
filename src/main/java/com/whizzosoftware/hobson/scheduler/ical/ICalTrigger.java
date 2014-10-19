@@ -10,8 +10,10 @@ package com.whizzosoftware.hobson.scheduler.ical;
 import com.whizzosoftware.hobson.api.action.HobsonActionRef;
 import com.whizzosoftware.hobson.api.action.manager.ActionManager;
 import com.whizzosoftware.hobson.api.trigger.HobsonTrigger;
+import com.whizzosoftware.hobson.bootstrap.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.scheduler.TriggerExecutionListener;
 import net.fortuna.ical4j.model.*;
+import net.fortuna.ical4j.model.Date;
 import net.fortuna.ical4j.model.component.VEvent;
 import net.fortuna.ical4j.model.property.*;
 import org.json.JSONArray;
@@ -22,6 +24,7 @@ import org.slf4j.LoggerFactory;
 
 import java.text.ParseException;
 import java.util.*;
+import java.util.TimeZone;
 
 /**
  * An implementation of HobsonTrigger for iCal scheduled events.
@@ -37,12 +40,25 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
     private final List<HobsonActionRef> actions = new ArrayList<>();
     private TriggerExecutionListener listener;
     private final Properties properties = new Properties();
+    private Double latitude = 39.3722;
+    private Double longitude = -104.8561;
+    private TimeZone timezone = TimeZone.getTimeZone("America/Denver");
 
     public ICalTrigger(ActionManager actionManager, String providerId, VEvent event, TriggerExecutionListener listener) throws InvalidVEventException {
         this.actionManager = actionManager;
         this.providerId = providerId;
         this.event = event;
         this.listener = listener;
+
+        // adjust start time if sun offset is set
+        Property sunOffset = event.getProperty("X-SUN-OFFSET");
+        if (sunOffset != null) {
+            try {
+                event.getStartDate().setValue(calculateSunOffset(event.getStartDate(), sunOffset.getValue(), latitude, longitude, timezone));
+            } catch (ParseException e) {
+                throw new InvalidVEventException("Invalid X-SUN-OFFSET", e);
+            }
+        }
 
         // parse actions
         if (event != null) {
@@ -87,15 +103,18 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
                     if (jc.has("start")) {
                         event.getProperties().add(new DtStart(jc.getString("start")));
                     }
+                    if (jc.has("sunOffset")) {
+                        event.getStartDate().setDate(new Date(calculateSunOffset(event.getStartDate(), jc.getString("sunOffset"), latitude, longitude, timezone)));
+                    }
                     if (jc.has("recurrence")) {
                         event.getProperties().add(new RRule(jc.getString("recurrence")));
                     }
                 } else {
-                    throw new RuntimeException("ICalTriggers only support one condition");
+                    throw new HobsonRuntimeException("ICalTriggers only support one condition");
                 }
             }
         } catch (ParseException e) {
-            throw new RuntimeException("Error parsing recurrence rule", e);
+            throw new HobsonRuntimeException("Error parsing recurrence rule", e);
         }
 
         try {
@@ -107,7 +126,7 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
                 }
             }
         } catch (Exception e) {
-            throw new RuntimeException("Error parsing actions", e);
+            throw new HobsonRuntimeException("Error parsing actions", e);
         }
     }
 
@@ -201,6 +220,11 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
             }
         }
         return results;
+    }
+
+    protected String calculateSunOffset(DtStart startDate, String sunOffset, Double latitude, Double longitude, TimeZone timezone) throws ParseException {
+        AstronomicalDtStart ads = new AstronomicalDtStart();
+        return ads.getDate(startDate.getValue(), sunOffset, latitude, longitude, timezone);
     }
 
     private void executeActions() {

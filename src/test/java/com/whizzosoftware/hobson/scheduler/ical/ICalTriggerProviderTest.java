@@ -121,6 +121,36 @@ public class ICalTriggerProviderTest {
     }
 
     @Test
+    public void testLoadScheduleWithSingleEventWithSunsetOffset() throws Exception {
+        TimeZone tz = TimeZone.getTimeZone("America/Denver");
+        String ical = "BEGIN:VCALENDAR\n" +
+                "VERSION:2.0\n" +
+                "BEGIN:VEVENT\n" +
+                "UID:uid1@example.com\n" +
+                "DTSTART:20141018T000000\n" +
+                "SUMMARY:My Task\n" +
+                "X-SUN-OFFSET: SS30\n" +
+                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]\n" +
+                "END:VEVENT\n" +
+                "END:VCALENDAR";
+
+        long startOfDay = DateHelper.getTime(tz, 2014, 10, 18, 0, 0, 0);
+
+        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        ICalTriggerProvider s = new ICalTriggerProvider(tz);
+        s.setScheduleExecutor(executor);
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
+
+        // verify task was created
+        assertEquals(1, s.getTriggers().size());
+        ICalTrigger t = (ICalTrigger)s.getTriggers().iterator().next();
+        assertEquals("My Task", t.getName());
+
+        // verify task was scheduled -- should have been scheduled to execute in 61200 seconds (17 hours)
+        assertEquals(67560000, (long)executor.getDelayForTask(t));
+    }
+
+    @Test
     public void testDayReset() throws Exception {
         TimeZone tz = TimeZone.getTimeZone("GMT");
 
