@@ -245,10 +245,14 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
 
                 // adjust time if there's an solar offset defined
                 if (solarOffset != null) {
-                    Calendar c = Calendar.getInstance();
-                    c.setTimeInMillis(time);
-                    c = SolarHelper.createCalendar(c, solarOffset, latitude, longitude);
-                    time = c.getTimeInMillis();
+                    if (latitude != null && longitude != null) {
+                        Calendar c = Calendar.getInstance();
+                        c.setTimeInMillis(time);
+                        c = SolarHelper.createCalendar(c, solarOffset, latitude, longitude);
+                        time = c.getTimeInMillis();
+                    } else {
+                        logger.warn("A scheduled trigger has a solar offset but not Hub latitude/longitude has been set; skipping it");
+                    }
                 }
 
                 results.add(time);
