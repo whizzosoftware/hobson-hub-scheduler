@@ -14,11 +14,11 @@ import java.text.ParseException;
  *
  * @author Dan Noguerol
  */
-public class AstronomicalOffset {
+public class SolarOffset {
     private int offset;
     private Type type;
 
-    public AstronomicalOffset(String s) throws ParseException {
+    public SolarOffset(String s) throws ParseException {
         s = s.trim();
         if (s.startsWith("SS")) {
             type = Type.SUNSET;

@@ -20,6 +20,7 @@ import net.fortuna.ical4j.model.component.VJournal;
 import net.fortuna.ical4j.model.property.Comment;
 import net.fortuna.ical4j.model.property.RRule;
 import net.fortuna.ical4j.model.property.Uid;
+import net.fortuna.ical4j.model.property.XProperty;
 import net.fortuna.ical4j.util.UidGenerator;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -28,7 +29,9 @@ import org.junit.Test;
 
 import java.io.File;
 import java.io.FileReader;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
 
 import static org.junit.Assert.*;
@@ -59,6 +62,46 @@ public class ICalTriggerTest {
         assertEquals("log", action.getActionId());
         assertEquals("My Action", action.getName());
         assertEquals("com.whizzosoftware.hobson.server-api", action.getPluginId());
+    }
+
+    @Test
+    public void testGetConditions() throws Exception {
+        TimeZone tz = TimeZone.getTimeZone("GMT");
+        VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0)), "task1");
+        event.getProperties().add(new UidGenerator("1").generateUid());
+        event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
+        Recur recur = new Recur("FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13");
+        event.getProperties().add(new RRule(recur));
+
+        ICalTrigger task = new ICalTrigger(null, "", event, null);
+
+        Collection<Map<String,Object>> conditions = task.getConditions();
+        assertEquals(1, conditions.size());
+        Map<String,Object> map = conditions.iterator().next();
+        assertEquals(2, map.size());
+        assertEquals("20010412T180000", map.get("start"));
+        assertEquals("FREQ=MONTHLY;BYMONTHDAY=13;BYDAY=FR", map.get("recurrence"));
+    }
+
+    @Test
+    public void testGetConditionsWithSunOffset() throws Exception {
+        TimeZone tz = TimeZone.getTimeZone("GMT");
+        VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0)), "task1");
+        event.getProperties().add(new UidGenerator("1").generateUid());
+        event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
+        Recur recur = new Recur("FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13");
+        event.getProperties().add(new RRule(recur));
+        event.getProperties().add(new XProperty(ICalTrigger.PROP_SUN_OFFSET, "SS"));
+
+        ICalTrigger task = new ICalTrigger(null, "", event, null);
+
+        Collection<Map<String,Object>> conditions = task.getConditions();
+        assertEquals(1, conditions.size());
+        Map<String,Object> map = conditions.iterator().next();
+        assertEquals(3, map.size());
+        assertEquals("20010412T180000", map.get("start"));
+        assertEquals("FREQ=MONTHLY;BYMONTHDAY=13;BYDAY=FR", map.get("recurrence"));
+        assertEquals("SS", map.get("sunOffset"));
     }
 
     @Test
@@ -139,7 +182,7 @@ public class ICalTriggerTest {
 
     @Test
     public void testJSONRuleConstruction() throws Exception {
-        ICalTriggerProvider provider = new ICalTriggerProvider();
+        ICalTriggerProvider provider = new ICalTriggerProvider("pluginId");
         provider.setScheduleExecutor(new MockScheduledTriggerExecutor());
 
         // validate we start with a non-existent temp file
@@ -179,5 +222,84 @@ public class ICalTriggerTest {
         } finally {
             assertTrue(calendarFile.delete());
         }
+    }
+
+    @Test
+    public void testJSONRuleConstructionWithSunOffset() throws Exception {
+        ICalTriggerProvider provider = new ICalTriggerProvider("pluginId");
+        provider.setScheduleExecutor(new MockScheduledTriggerExecutor());
+
+        // validate we start with a non-existent temp file
+        File calendarFile = File.createTempFile("schedule", ".ics");
+        assertTrue(calendarFile.delete());
+        assertFalse(calendarFile.exists());
+
+        try {
+            provider.setScheduleFile(calendarFile);
+            JSONObject json = new JSONObject(new JSONTokener("{'name':'My Trigger','conditions':[{'start':'20140701T100000','recurrence':'FREQ=MINUTELY;INTERVAL=1','sunOffset':'SR'}],'actions':[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'logentry'}}]}"));
+            provider.addTrigger(json);
+
+            // make sure the provider updated the rule file
+            assertTrue(calendarFile.exists());
+            Calendar cal = new CalendarBuilder().build(new FileReader(calendarFile));
+
+            assertEquals(2, cal.getComponents().size());
+            assertTrue(cal.getComponents().get(0) instanceof VJournal);
+            assertTrue(cal.getComponents().get(1) instanceof VEvent);
+
+            VEvent event = (VEvent)cal.getComponents().get(1);
+            assertNotNull(event.getUid().getValue());
+            assertEquals("My Trigger", event.getSummary().getValue());
+
+            assertEquals("20140701T100000", event.getProperties().getProperty("DTSTART").getValue());
+            assertEquals("FREQ=MINUTELY;INTERVAL=1", event.getProperties().getProperty("RRULE").getValue());
+            assertEquals("SR", event.getProperties().getProperty(ICalTrigger.PROP_SUN_OFFSET).getValue());
+
+            assertNotNull(event.getProperties().getProperty("COMMENT"));
+            JSONArray jarray = new JSONArray(new JSONTokener(event.getProperties().getProperty("COMMENT").getValue()));
+            assertEquals(1, jarray.length());
+            JSONObject ajson = jarray.getJSONObject(0);
+            assertEquals("com.whizzosoftware.hobson.server-api", ajson.getString("pluginId"));
+            assertEquals("log", ajson.getString("actionId"));
+            assertTrue(ajson.has("properties"));
+            JSONObject props = ajson.getJSONObject("properties");
+            assertEquals("logentry", props.getString("message"));
+        } finally {
+            assertTrue(calendarFile.delete());
+        }
+    }
+
+    @Test
+    public void testSunOffset() throws Exception {
+        MockActionManager am = new MockActionManager();
+        TimeZone tz = TimeZone.getTimeZone("America/Denver");
+        VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0)), "task1");
+        event.getProperties().add(new UidGenerator("1").generateUid());
+        event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
+        event.getProperties().add(new XProperty(ICalTrigger.PROP_SUN_OFFSET, "SS+30"));
+        Recur recur = new Recur("FREQ=DAILY;INTERVAL=1");
+        event.getProperties().add(new RRule(recur));
+
+        ICalTrigger trigger = new ICalTrigger(am, "providerId", event, null);
+        trigger.setLatitude(39.3722);
+        trigger.setLongitude(-104.8561);
+
+        List<Long> runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 10, 19, 23, 59, 59));
+        assertEquals(1, runs.size());
+        assertEquals(1413765900000l, (long)runs.get(0));
+
+        runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 12, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 12, 19, 23, 59, 59));
+        assertEquals(1, runs.size());
+        assertEquals(1419034080000l, (long)runs.get(0));
+
+        runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2015, 7, 19, 0, 0, 0), DateHelper.getTime(tz, 2015, 7, 19, 23, 59, 59));
+        assertEquals(1, runs.size());
+        assertEquals(1437360780000l, (long)runs.get(0));
+
+        // This one is interesting -- since we store the start time for events with a sun offset as midnight, this event
+        // technically would have already run as it's strictly defined by the VEvent. However, with the sun offset the
+        // start time is pushed until after the current time and it SHOULD run
+        runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 20, 16, 46, 0), DateHelper.getTime(tz, 2014, 10, 20, 23, 59, 59));
+        assertEquals(1, runs.size());
     }
 }

@@ -20,7 +20,7 @@ import java.util.TimeZone;
 public class ICalTriggerProviderTest {
     @Test
     public void testloadCalendarWithNoExecutor() {
-        ICalTriggerProvider scheduler = new ICalTriggerProvider();
+        ICalTriggerProvider scheduler = new ICalTriggerProvider("pluginId");
         String s = "";
         try {
             scheduler.loadICSStream(new ByteArrayInputStream(s.getBytes()), System.currentTimeMillis());
@@ -34,7 +34,7 @@ public class ICalTriggerProviderTest {
         File sfile = File.createTempFile("hobsonschedule", ".ics");
         sfile.delete();
         try {
-            ICalTriggerProvider scheduler = new ICalTriggerProvider();
+            ICalTriggerProvider scheduler = new ICalTriggerProvider("pluginId");
             scheduler.setScheduleExecutor(new MockScheduledTriggerExecutor());
             scheduler.setScheduleFile(sfile);
         } finally {
@@ -63,7 +63,7 @@ public class ICalTriggerProviderTest {
 
         long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
 
-        ICalTriggerProvider s = new ICalTriggerProvider(tz);
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
@@ -94,7 +94,7 @@ public class ICalTriggerProviderTest {
         long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
 
         MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
-        ICalTriggerProvider s = new ICalTriggerProvider(tz);
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
@@ -137,7 +137,9 @@ public class ICalTriggerProviderTest {
         long startOfDay = DateHelper.getTime(tz, 2014, 10, 18, 0, 0, 0);
 
         MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
-        ICalTriggerProvider s = new ICalTriggerProvider(tz);
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        s.setLatitude("39.3722");
+        s.setLongitude("-104.8561");
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
@@ -170,7 +172,7 @@ public class ICalTriggerProviderTest {
 
         MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
         MockActionManager actionContext = new MockActionManager();
-        ICalTriggerProvider s = new ICalTriggerProvider(tz);
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionContext);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), schedulerStart);
@@ -206,7 +208,7 @@ public class ICalTriggerProviderTest {
         // start the scheduler after the task should have run
         MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTriggerProvider s = new ICalTriggerProvider(tz);
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 17, 0, 0));
@@ -253,7 +255,7 @@ public class ICalTriggerProviderTest {
 
         MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
         MockActionManager actionContext = new MockActionManager();
-        ICalTriggerProvider scheduler = new ICalTriggerProvider(tz);
+        ICalTriggerProvider scheduler = new ICalTriggerProvider("pluginId", tz);
         scheduler.setScheduleExecutor(executor);
         scheduler.setActionManager(actionContext);
 

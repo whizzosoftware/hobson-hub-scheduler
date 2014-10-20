@@ -12,47 +12,47 @@ import static org.junit.Assert.*;
 
 import java.text.ParseException;
 
-public class AstronomicalOffsetTest {
+public class SolarOffsetTest {
     @Test
     public void testValidConstructor() throws ParseException {
         // positive offset after sunset
-        AstronomicalOffset ao = new AstronomicalOffset("SS30");
+        SolarOffset ao = new SolarOffset("SS30");
         assertEquals(30, ao.getOffset());
-        assertEquals(AstronomicalOffset.Type.SUNSET, ao.getType());
+        assertEquals(SolarOffset.Type.SUNSET, ao.getType());
 
         // negative offset after sunset
-        ao = new AstronomicalOffset("SS-30");
+        ao = new SolarOffset("SS-30");
         assertEquals(-30, ao.getOffset());
-        assertEquals(AstronomicalOffset.Type.SUNSET, ao.getType());
+        assertEquals(SolarOffset.Type.SUNSET, ao.getType());
 
         // no offset after sunset
-        ao = new AstronomicalOffset("SS");
+        ao = new SolarOffset("SS");
         assertEquals(0, ao.getOffset());
-        assertEquals(AstronomicalOffset.Type.SUNSET, ao.getType());
+        assertEquals(SolarOffset.Type.SUNSET, ao.getType());
 
         // no offset after sunset (with leading space)
-        ao = new AstronomicalOffset(" SS");
+        ao = new SolarOffset(" SS");
         assertEquals(0, ao.getOffset());
-        assertEquals(AstronomicalOffset.Type.SUNSET, ao.getType());
+        assertEquals(SolarOffset.Type.SUNSET, ao.getType());
 
         // positive offset after sunset
-        ao = new AstronomicalOffset("SR30");
+        ao = new SolarOffset("SR30");
         assertEquals(30, ao.getOffset());
-        assertEquals(AstronomicalOffset.Type.SUNRISE, ao.getType());
+        assertEquals(SolarOffset.Type.SUNRISE, ao.getType());
 
         // negative offset after sunset
-        ao = new AstronomicalOffset("SR-30");
+        ao = new SolarOffset("SR-30");
         assertEquals(-30, ao.getOffset());
-        assertEquals(AstronomicalOffset.Type.SUNRISE, ao.getType());
+        assertEquals(SolarOffset.Type.SUNRISE, ao.getType());
 
         // no offset after sunrise
-        ao = new AstronomicalOffset("SR");
+        ao = new SolarOffset("SR");
         assertEquals(0, ao.getOffset());
-        assertEquals(AstronomicalOffset.Type.SUNRISE, ao.getType());
+        assertEquals(SolarOffset.Type.SUNRISE, ao.getType());
 
         // no offset after sunrise (with leading space)
-        ao = new AstronomicalOffset(" SR");
+        ao = new SolarOffset(" SR");
         assertEquals(0, ao.getOffset());
-        assertEquals(AstronomicalOffset.Type.SUNRISE, ao.getType());
+        assertEquals(SolarOffset.Type.SUNRISE, ao.getType());
     }
 }

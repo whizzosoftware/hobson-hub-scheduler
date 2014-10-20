@@ -12,6 +12,7 @@ import com.whizzosoftware.hobson.api.trigger.HobsonTrigger;
 import com.whizzosoftware.hobson.api.trigger.TriggerProvider;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherListener;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherThread;
+import com.whizzosoftware.hobson.bootstrap.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.scheduler.TriggerExecutionListener;
 import com.whizzosoftware.hobson.scheduler.executor.ScheduledTriggerExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
@@ -50,21 +51,43 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
 
     private volatile ActionManager actionManager;
 
+    private String pluginId;
     private Calendar calendar;
     private ScheduledTriggerExecutor executor;
     private final Map<String,ICalTrigger> triggerMap = new HashMap<>();
     private File scheduleFile;
     private FileWatcherThread watcherThread;
     private ScheduledThreadPoolExecutor resetDayExecutor;
+    private Double latitude;
+    private Double longitude;
     private TimeZone timeZone;
     private boolean running = true;
 
-    public ICalTriggerProvider() {
-        timeZone = TimeZone.getDefault();
+    public ICalTriggerProvider(String pluginId) {
+        this(pluginId, TimeZone.getDefault());
     }
 
-    public ICalTriggerProvider(TimeZone timeZone) {
+    public ICalTriggerProvider(String pluginId, TimeZone timeZone) {
+        this.pluginId = pluginId;
         this.timeZone = timeZone;
+    }
+
+    @Override
+    public String getPluginId() {
+        return pluginId;
+    }
+
+    @Override
+    public String getId() {
+        return PROVIDER;
+    }
+
+    public void setLatitude(String latitude) {
+        this.latitude = Double.parseDouble(latitude);
+    }
+
+    public void setLongitude(String longitude) {
+        this.longitude = Double.parseDouble(longitude);
     }
 
     @Override
@@ -82,6 +105,8 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         try {
             JSONObject json = (JSONObject)trigger;
             ICalTrigger ict = new ICalTrigger(actionManager, PROVIDER, json);
+            ict.setLatitude(latitude);
+            ict.setLongitude(longitude);
             calendar.getComponents().add(ict.getVEvent());
             writeFile();
         } catch (Exception e) {
@@ -122,28 +147,32 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         }
     }
 
-    public void setScheduleFile(File scheduleFile) throws Exception {
+    public void setScheduleFile(File scheduleFile) {
         this.scheduleFile = scheduleFile;
 
         restartFileWatcher();
 
         if (scheduleFile != null) {
-            // create empty calendar file if it doesn't exist
-            if (!scheduleFile.exists()) {
-                Calendar calendar = new Calendar();
-                calendar.getProperties().add(new ProdId("-//Whizzo Software//Hobson 1.0//EN"));
-                calendar.getProperties().add(Version.VERSION_2_0);
-                calendar.getProperties().add(CalScale.GREGORIAN);
-                VJournal entry = new VJournal(new Date(), "Created");
-                entry.getProperties().add(new Uid(UUID.randomUUID().toString()));
-                calendar.getComponents().add(entry);
-                CalendarOutputter outputter = new CalendarOutputter();
-                outputter.output(calendar, new FileOutputStream(scheduleFile));
-            }
+            try {
+                // create empty calendar file if it doesn't exist
+                if (!scheduleFile.exists()) {
+                    Calendar calendar = new Calendar();
+                    calendar.getProperties().add(new ProdId("-//Whizzo Software//Hobson 1.0//EN"));
+                    calendar.getProperties().add(Version.VERSION_2_0);
+                    calendar.getProperties().add(CalScale.GREGORIAN);
+                    VJournal entry = new VJournal(new Date(), "Created");
+                    entry.getProperties().add(new Uid(UUID.randomUUID().toString()));
+                    calendar.getComponents().add(entry);
+                    CalendarOutputter outputter = new CalendarOutputter();
+                    outputter.output(calendar, new FileOutputStream(scheduleFile));
+                }
 
-            // load the calendar file
-            logger.info("Scheduler loading file: {}", scheduleFile.getAbsolutePath());
-            loadICSStream(new FileInputStream(scheduleFile), System.currentTimeMillis());
+                // load the calendar file
+                logger.info("Scheduler loading file: {}", scheduleFile.getAbsolutePath());
+                loadICSStream(new FileInputStream(scheduleFile), System.currentTimeMillis());
+            } catch (Exception e) {
+                throw new HobsonRuntimeException("Error setting schedule file", e);
+            }
         }
     }
 
@@ -260,6 +289,8 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         for (Object anEventList : eventList) {
             VEvent event = (VEvent)anEventList;
             ICalTrigger trigger = new ICalTrigger(actionManager, PROVIDER, event, this);
+            trigger.setLatitude(latitude);
+            trigger.setLongitude(longitude);
             // if task wasn't added and it's a day reset, check if the task should have already run today
             if (!addTrigger(trigger, now, endOfToday) && wasDayReset) {
                 List<Long> runTimes = trigger.getRunsDuringInterval(startOfToday, endOfToday);

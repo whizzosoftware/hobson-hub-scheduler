@@ -12,8 +12,9 @@ import com.whizzosoftware.hobson.api.action.manager.ActionManager;
 import com.whizzosoftware.hobson.api.trigger.HobsonTrigger;
 import com.whizzosoftware.hobson.bootstrap.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.scheduler.TriggerExecutionListener;
+import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
+import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.model.*;
-import net.fortuna.ical4j.model.Date;
 import net.fortuna.ical4j.model.component.VEvent;
 import net.fortuna.ical4j.model.property.*;
 import org.json.JSONArray;
@@ -24,7 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.text.ParseException;
 import java.util.*;
-import java.util.TimeZone;
+import java.util.Calendar;
 
 /**
  * An implementation of HobsonTrigger for iCal scheduled events.
@@ -34,15 +35,17 @@ import java.util.TimeZone;
 public class ICalTrigger implements HobsonTrigger, Runnable {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
+    protected static final String PROP_SUN_OFFSET = "X-SUN-OFFSET";
+
     private String providerId;
     private ActionManager actionManager;
     private VEvent event;
     private final List<HobsonActionRef> actions = new ArrayList<>();
     private TriggerExecutionListener listener;
     private final Properties properties = new Properties();
-    private Double latitude = 39.3722;
-    private Double longitude = -104.8561;
-    private TimeZone timezone = TimeZone.getTimeZone("America/Denver");
+    private Double latitude;// = 39.3722;
+    private Double longitude;// = -104.8561;
+    private SolarOffset solarOffset;
 
     public ICalTrigger(ActionManager actionManager, String providerId, VEvent event, TriggerExecutionListener listener) throws InvalidVEventException {
         this.actionManager = actionManager;
@@ -50,18 +53,18 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
         this.event = event;
         this.listener = listener;
 
-        // adjust start time if sun offset is set
-        Property sunOffset = event.getProperty("X-SUN-OFFSET");
-        if (sunOffset != null) {
-            try {
-                event.getStartDate().setValue(calculateSunOffset(event.getStartDate(), sunOffset.getValue(), latitude, longitude, timezone));
-            } catch (ParseException e) {
-                throw new InvalidVEventException("Invalid X-SUN-OFFSET", e);
-            }
-        }
-
-        // parse actions
         if (event != null) {
+            // adjust start time if sun offset is set
+            Property sunOffset = event.getProperty(PROP_SUN_OFFSET);
+            if (sunOffset != null) {
+                try {
+                    solarOffset = new SolarOffset(sunOffset.getValue());
+                } catch (ParseException e) {
+                    throw new InvalidVEventException("Invalid X-SUN-OFFSET", e);
+                }
+            }
+
+            // parse actions
             Property commentProp = event.getProperty("COMMENT");
             if (commentProp != null) {
                 JSONArray arr = new JSONArray(new JSONTokener(commentProp.getValue()));
@@ -103,11 +106,11 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
                     if (jc.has("start")) {
                         event.getProperties().add(new DtStart(jc.getString("start")));
                     }
-                    if (jc.has("sunOffset")) {
-                        event.getStartDate().setDate(new Date(calculateSunOffset(event.getStartDate(), jc.getString("sunOffset"), latitude, longitude, timezone)));
-                    }
                     if (jc.has("recurrence")) {
                         event.getProperties().add(new RRule(jc.getString("recurrence")));
+                    }
+                    if (jc.has("sunOffset")) {
+                        event.getProperties().add(new XProperty(PROP_SUN_OFFSET, jc.getString("sunOffset")));
                     }
                 } else {
                     throw new HobsonRuntimeException("ICalTriggers only support one condition");
@@ -175,6 +178,10 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
         map.put("start", event.getStartDate().getValue());
         RRule rrule = (RRule)event.getProperty("RRULE");
         map.put("recurrence", rrule.getRecur().toString());
+        Property p = event.getProperty(PROP_SUN_OFFSET);
+        if (p != null) {
+            map.put("sunOffset", p.getValue());
+        }
         conditions.add(map);
         return conditions;
     }
@@ -207,6 +214,14 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
         }
     }
 
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
+    }
+
     public VEvent getVEvent() {
         return event;
     }
@@ -214,17 +229,32 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
     public List<Long> getRunsDuringInterval(long startTime, long endTime) throws Exception {
         List<Long> results = new ArrayList<>();
         if (event != null) {
+            // if there's a solar offset, reset the start time to the beginning of the day so that
+            // we can see if the event should run at any point during the first to subsequent days
+            if (solarOffset != null) {
+                Calendar c = Calendar.getInstance();
+                c.setTimeInMillis(startTime);
+                DateHelper.resetToBeginningOfDay(c);
+                startTime = c.getTimeInMillis();
+            }
+
             PeriodList periods = event.calculateRecurrenceSet(new Period(new DateTime(startTime), new DateTime(endTime)));
             for (Object period : periods) {
-                results.add(((Period) period).getStart().getTime());
+                // get the recurrence time
+                long time = ((Period)period).getStart().getTime();
+
+                // adjust time if there's an solar offset defined
+                if (solarOffset != null) {
+                    Calendar c = Calendar.getInstance();
+                    c.setTimeInMillis(time);
+                    c = SolarHelper.createCalendar(c, solarOffset, latitude, longitude);
+                    time = c.getTimeInMillis();
+                }
+
+                results.add(time);
             }
         }
         return results;
-    }
-
-    protected String calculateSunOffset(DtStart startDate, String sunOffset, Double latitude, Double longitude, TimeZone timezone) throws ParseException {
-        AstronomicalDtStart ads = new AstronomicalDtStart();
-        return ads.getDate(startDate.getValue(), sunOffset, latitude, longitude, timezone);
     }
 
     private void executeActions() {
