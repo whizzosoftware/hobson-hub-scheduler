@@ -35,9 +35,9 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
 
         // create an ical trigger provider
         ICalTriggerProvider provider = new ICalTriggerProvider(getId());
+        applyProviderConfig(provider, config);
         provider.setScheduleExecutor(new ThreadPoolScheduledTriggerExecutor());
         provider.setScheduleFile(getDataFile("schedule.ics"));
-        applyProviderConfig(provider, config);
 
         this.triggerProvider = provider;
         publishTriggerProvider(provider);

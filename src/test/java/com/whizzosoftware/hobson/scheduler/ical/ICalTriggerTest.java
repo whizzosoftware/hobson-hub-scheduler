@@ -302,4 +302,21 @@ public class ICalTriggerTest {
         runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 20, 16, 46, 0), DateHelper.getTime(tz, 2014, 10, 20, 23, 59, 59));
         assertEquals(1, runs.size());
     }
+
+    @Test
+    public void testGetRunsForIntervalWithNoLatLong() throws Exception {
+        MockActionManager am = new MockActionManager();
+        TimeZone tz = TimeZone.getTimeZone("America/Denver");
+        VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0)), "task1");
+        event.getProperties().add(new UidGenerator("1").generateUid());
+        event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
+        event.getProperties().add(new XProperty(ICalTrigger.PROP_SUN_OFFSET, "SS+30"));
+        Recur recur = new Recur("FREQ=DAILY;INTERVAL=1");
+        event.getProperties().add(new RRule(recur));
+
+        ICalTrigger trigger = new ICalTrigger(am, "providerId", event, null);
+
+        List<Long> runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 10, 19, 23, 59, 59));
+        assertEquals(0, runs.size());
+    }
 }

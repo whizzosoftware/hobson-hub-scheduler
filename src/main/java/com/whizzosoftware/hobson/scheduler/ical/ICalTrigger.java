@@ -232,6 +232,10 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
             // if there's a solar offset, reset the start time to the beginning of the day so that
             // we can see if the event should run at any point during the first to subsequent days
             if (solarOffset != null) {
+                if (latitude == null || longitude == null) {
+                    logger.warn("Scheduled trigger \"{}\" has a solar offset but no Hub latitude/longitude has been set; no schedule can be calculated", getName());
+                    return results;
+                }
                 Calendar c = Calendar.getInstance();
                 c.setTimeInMillis(startTime);
                 DateHelper.resetToBeginningOfDay(c);
@@ -245,14 +249,10 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
 
                 // adjust time if there's an solar offset defined
                 if (solarOffset != null) {
-                    if (latitude != null && longitude != null) {
                         Calendar c = Calendar.getInstance();
                         c.setTimeInMillis(time);
                         c = SolarHelper.createCalendar(c, solarOffset, latitude, longitude);
                         time = c.getTimeInMillis();
-                    } else {
-                        logger.warn("A scheduled trigger has a solar offset but not Hub latitude/longitude has been set; skipping it");
-                    }
                 }
 
                 results.add(time);
