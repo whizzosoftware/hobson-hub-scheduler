@@ -69,7 +69,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
     }
 
     private void applyProviderConfig(ICalTriggerProvider provider, Dictionary config) {
-        if (config.get("latitude") != null && config.get("longitude") != null) {
+        if (config != null && config.get("latitude") != null && config.get("longitude") != null) {
             provider.setLatitude((String)config.get("latitude"));
             provider.setLongitude((String) config.get("longitude"));
         }

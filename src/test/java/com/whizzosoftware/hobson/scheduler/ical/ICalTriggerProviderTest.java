@@ -230,6 +230,48 @@ public class ICalTriggerProviderTest {
     }
 
     @Test
+    public void testDayResetWithSolarOffsetTrigger() throws Exception {
+        TimeZone tz = TimeZone.getDefault();
+
+        // an event that runs every day at midnight
+        String ical = "BEGIN:VCALENDAR\n" +
+                "VERSION:2.0\n" +
+                "BEGIN:VEVENT\n" +
+                "UID:uid1@example.com\n" +
+                "DTSTART:20140701T000000\n" +
+                "RRULE:FREQ=DAILY\n" +
+                "X-SUN-OFFSET:SS30\n" +
+                "SUMMARY:My Task\n" +
+                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
+                "END:VEVENT\n" +
+                "END:VCALENDAR";
+
+        // start the scheduler after the task should have run
+        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockActionManager actionManager = new MockActionManager();
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        s.setLatitude("39.3722");
+        s.setLongitude("-104.8561");
+        s.setScheduleExecutor(executor);
+        s.setActionManager(actionManager);
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
+
+        // verify task was not scheduled or executed
+        assertEquals(1, s.getTriggers().size());
+        assertFalse(executor.isTriggerScheduled((ICalTrigger)s.getTriggers().iterator().next()));
+        assertEquals(0, actionManager.getLogCalls());
+
+        // start a new day at midnight
+        s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 0));
+
+        // verify task was scheduled at appropriate time and task did not execute
+        assertEquals(1, s.getTriggers().size());
+        assertTrue(executor.isTriggerScheduled((ICalTrigger)s.getTriggers().iterator().next()));
+        assertEquals(75600000, (long)executor.getDelayForTask((ICalTrigger)s.getTriggers().iterator().next()));
+        assertEquals(0, actionManager.getLogCalls());
+    }
+
+    @Test
     public void testTaskRescheduling() throws Exception {
         TimeZone tz = TimeZone.getTimeZone("GMT");
 

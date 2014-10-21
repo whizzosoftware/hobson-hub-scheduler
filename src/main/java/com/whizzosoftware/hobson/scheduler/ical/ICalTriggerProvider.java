@@ -123,7 +123,9 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         List<Long> todaysRunTimes = trigger.getRunsDuringInterval(now, endOfToday);
         if (todaysRunTimes.size() > 0) {
             long delayInMs = todaysRunTimes.get(0) - now;
-            scheduleTrigger(trigger, delayInMs);
+            if (delayInMs > 0) {
+                scheduleTrigger(trigger, delayInMs);
+            }
             return true;
         }
         return false;
