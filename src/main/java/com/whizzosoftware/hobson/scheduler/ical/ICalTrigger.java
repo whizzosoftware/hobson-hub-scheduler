@@ -43,8 +43,8 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
     private final List<HobsonActionRef> actions = new ArrayList<>();
     private TriggerExecutionListener listener;
     private final Properties properties = new Properties();
-    private Double latitude;// = 39.3722;
-    private Double longitude;// = -104.8561;
+    private Double latitude;
+    private Double longitude;
     private SolarOffset solarOffset;
 
     public ICalTrigger(ActionManager actionManager, String providerId, VEvent event, TriggerExecutionListener listener) throws InvalidVEventException {
@@ -262,8 +262,12 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
     }
 
     private void executeActions() {
-        for (HobsonActionRef ref : actions) {
-            actionManager.executeAction(ref.getPluginId(), ref.getActionId(), ref.getProperties());
+        if (actionManager != null) {
+            for (HobsonActionRef ref : actions) {
+                actionManager.executeAction(ref.getPluginId(), ref.getActionId(), ref.getProperties());
+            }
+        } else {
+            logger.error("No action manager is available to execute actions");
         }
     }
 

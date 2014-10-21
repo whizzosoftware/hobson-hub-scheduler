@@ -49,9 +49,8 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
 
     private static final long MS_24_HOURS = 86400000;
 
-    private volatile ActionManager actionManager;
-
     private String pluginId;
+    private ActionManager actionManager;
     private Calendar calendar;
     private ScheduledTriggerExecutor executor;
     private final Map<String,ICalTrigger> triggerMap = new HashMap<>();
