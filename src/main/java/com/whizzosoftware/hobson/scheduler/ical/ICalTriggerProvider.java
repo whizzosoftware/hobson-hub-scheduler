@@ -81,12 +81,20 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         return PROVIDER;
     }
 
-    public void setLatitude(String latitude) {
-        this.latitude = Double.parseDouble(latitude);
+    public Double getLatitude() {
+        return latitude;
     }
 
-    public void setLongitude(String longitude) {
-        this.longitude = Double.parseDouble(longitude);
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
     }
 
     @Override
@@ -113,46 +121,76 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         }
     }
 
-    protected boolean addTrigger(ICalTrigger trigger, long now) throws Exception {
-        return addTrigger(trigger, now, DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis());
-    }
-
-    protected boolean addTrigger(ICalTrigger trigger, long now, long endOfToday) throws Exception {
+    /**
+     * Adds a new trigger.
+     *
+     * @param trigger the trigger to add
+     * @param now the current time
+     * @param wasDayReset indicates whether this is being done as part of a new day reset
+     *
+     * @return a boolean indicating whether the trigger should be run immediately
+     *
+     * @throws Exception on failure
+     */
+    protected boolean addTrigger(ICalTrigger trigger, long now, boolean wasDayReset) throws Exception {
         logger.debug("Adding task {} with ID: {}", trigger.getName(), trigger.getId());
         triggerMap.put(trigger.getId(), trigger);
-        return scheduleNextRun(trigger, now, endOfToday);
+        return scheduleNextRun(trigger, now, wasDayReset);
     }
 
-    protected boolean scheduleNextRun(ICalTrigger trigger, long now, long endOfToday) throws Exception {
-        // check if there are any runs in the next two days
-        List<Long> todaysRunTimes = trigger.getRunsDuringInterval(now, now + 86400000l);
-        // if not, check if there are any runs in the next 6 weeks
-        if (todaysRunTimes.size() == 0 || (todaysRunTimes.size() == 1 && todaysRunTimes.get(0) == now)) {
-            todaysRunTimes = trigger.getRunsDuringInterval(now, now + 3628800000l);
-            // it not, check if there are any runs in the next 53 weeks
-            if (todaysRunTimes.size() == 0 || (todaysRunTimes.size() == 1 && todaysRunTimes.get(0) == now)) {
-                todaysRunTimes = trigger.getRunsDuringInterval(now, now + 32054400000l);
-            }
-        }
-        if (todaysRunTimes != null && todaysRunTimes.size() > 0) {
-            long nextRunTime = 0;
-            for (Long l : todaysRunTimes) {
-                if (l - now > 0) {
-                    nextRunTime = l;
-                    break;
-                }
-            }
-            if (nextRunTime > 0) {
-                trigger.getProperties().put(ICalTrigger.PROP_NEXT_RUN_TIME, nextRunTime);
-                if (nextRunTime < endOfToday) {
-                    trigger.getProperties().put(ICalTrigger.PROP_SCHEDULED, true);
-                    executor.schedule(trigger, nextRunTime - now);
-                    return true;
-                }
-            }
-        }
+    /**
+     * Schedules the next run of a trigger.
+     *
+     * @param trigger the trigger to schedule
+     * @param now the current time
+     * @param wasDayReset indicates whether this is being done as part of a new day reset
+     *
+     * @return a boolean indicating whether the trigger should be run immediately
+     *
+     * @throws Exception on failure
+     */
+    protected boolean scheduleNextRun(ICalTrigger trigger, long now, boolean wasDayReset) throws Exception {
+        long startOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 0, 0, 0, 0).getTimeInMillis();
+        long endOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
+        boolean shouldRunToday = false;
+
         trigger.getProperties().put(ICalTrigger.PROP_SCHEDULED, false);
-        return false;
+
+        try {
+            // check if there is more than 1 run in the next two days
+            List<Long> todaysRunTimes = trigger.getRunsDuringInterval(startOfToday, startOfToday + 86400000l);
+            // if not, check if there is more than 1 run in the next 6 weeks
+            if (todaysRunTimes.size() < 2) {
+                todaysRunTimes = trigger.getRunsDuringInterval(startOfToday, startOfToday + 3628800000l);
+                // it not, check if there is more than 1 run in the next 53 weeks
+                if (todaysRunTimes.size() < 2) {
+                    todaysRunTimes = trigger.getRunsDuringInterval(startOfToday, startOfToday + 32054400000l);
+                }
+            }
+
+            if (todaysRunTimes.size() > 0) {
+                long nextRunTime = 0;
+                for (Long l : todaysRunTimes) {
+                    if (l - now < 0 && wasDayReset) {
+                        shouldRunToday = true;
+                    } else if (l - now > 0) {
+                        nextRunTime = l;
+                        break;
+                    }
+                }
+                if (nextRunTime > 0) {
+                    trigger.getProperties().put(ICalTrigger.PROP_NEXT_RUN_TIME, nextRunTime);
+                    if (nextRunTime < endOfToday) {
+                        trigger.getProperties().put(ICalTrigger.PROP_SCHEDULED, true);
+                        executor.schedule(trigger, nextRunTime - now);
+                    }
+                }
+            }
+        } catch (SchedulingException e) {
+            trigger.getProperties().put(ICalTrigger.PROP_ERROR, e.getLocalizedMessage());
+        }
+
+        return shouldRunToday;
     }
 
     @Override
@@ -267,7 +305,7 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
             try {
                 long endOfDay = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
                 logger.debug("Task is done executing; checking for any more runs between {} and {}", now, endOfDay);
-                scheduleNextRun(trigger, now, endOfDay);
+                scheduleNextRun(trigger, now, false);
             } catch (Exception e) {
                 logger.error("Unable to determine if task needs to run again today", e);
             }
@@ -294,10 +332,6 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         clearAllTasks();
 
         // determine first & last milliseconds of today
-        long startOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 0, 0, 0, 0).getTimeInMillis();
-        long endOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
-
-        logger.debug("Checking task applicability between {} and {}", new Date(now), new Date(endOfToday));
 
         // iterate through all events and schedule them if they are supposed to run today
         ComponentList eventList = calendar.getComponents(Component.VEVENT);
@@ -306,13 +340,8 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
             ICalTrigger trigger = new ICalTrigger(actionManager, PROVIDER, event, this);
             trigger.setLatitude(latitude);
             trigger.setLongitude(longitude);
-            // if task wasn't added and it's a day reset, check if the task should have already run today
-            if (!addTrigger(trigger, now, endOfToday) && wasDayReset) {
-                List<Long> runTimes = trigger.getRunsDuringInterval(startOfToday, endOfToday);
-                // if it should have run already, manually run it
-                if (runTimes != null && runTimes.size() > 0 && runTimes.get(0) < now) {
-                    trigger.run(now);
-                }
+            if (addTrigger(trigger, now, wasDayReset)) {
+                trigger.run(now);
             }
         }
     }

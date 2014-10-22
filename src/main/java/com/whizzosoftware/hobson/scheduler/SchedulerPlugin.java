@@ -36,7 +36,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
 
         // create an ical trigger provider
         triggerProvider = new ICalTriggerProvider(getId());
-        applyProviderConfig(triggerProvider, config);
+        applyProviderConfig(triggerProvider, config, false);
         triggerProvider.setScheduleExecutor(new ThreadPoolScheduledTriggerExecutor());
         triggerProvider.setScheduleFile(getDataFile("schedule.ics"));
         publishTriggerProvider(triggerProvider);
@@ -62,7 +62,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
 
     @Override
     public void onPluginConfigurationUpdate(Dictionary dictionary) {
-        applyProviderConfig(triggerProvider, dictionary);
+        applyProviderConfig(triggerProvider, dictionary, true);
     }
 
     @Override
@@ -70,11 +70,21 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
         return "Hobson Scheduler";
     }
 
-    private void applyProviderConfig(ICalTriggerProvider provider, Dictionary config) {
-        if (config != null && config.get("latitude") != null && config.get("longitude") != null) {
-            provider.setLatitude((String)config.get("latitude"));
-            provider.setLongitude((String) config.get("longitude"));
-            triggerProvider.reloadScheduleFile();
+    protected void applyProviderConfig(ICalTriggerProvider provider, Dictionary config, boolean reload) {
+        if (config != null) {
+            String newLatitudeS = (String)config.get("latitude");
+            String newLongitudeS = (String)config.get("longitude");
+            if (newLatitudeS != null && newLongitudeS != null) {
+                Double newLatitude = Double.parseDouble(newLatitudeS);
+                Double newLongitude = Double.parseDouble(newLongitudeS);
+                if (!newLatitude.equals(provider.getLatitude()) && !newLongitude.equals(provider.getLongitude())) {
+                    provider.setLatitude(newLatitude);
+                    provider.setLongitude(newLongitude);
+                    if (reload) {
+                        triggerProvider.reloadScheduleFile();
+                    }
+                }
+            }
         }
     }
 }

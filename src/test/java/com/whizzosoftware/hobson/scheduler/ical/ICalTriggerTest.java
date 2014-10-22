@@ -316,7 +316,10 @@ public class ICalTriggerTest {
 
         ICalTrigger trigger = new ICalTrigger(am, "providerId", event, null);
 
-        List<Long> runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 10, 19, 23, 59, 59));
-        assertEquals(0, runs.size());
+        List<Long> runs = null;
+        try {
+            runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 10, 19, 23, 59, 59));
+            fail("Should have thrown exception");
+        } catch (SchedulingException ignored) {}
     }
 }

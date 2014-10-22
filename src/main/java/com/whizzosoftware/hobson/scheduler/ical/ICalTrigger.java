@@ -38,6 +38,7 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
     protected static final String PROP_SUN_OFFSET = "X-SUN-OFFSET";
     protected static final String PROP_NEXT_RUN_TIME = "nextRunTime";
     protected static final String PROP_SCHEDULED = "scheduled";
+    protected static final String PROP_ERROR = "error";
 
     private String providerId;
     private ActionManager actionManager;
@@ -232,15 +233,14 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
         return event;
     }
 
-    public List<Long> getRunsDuringInterval(long startTime, long endTime) throws Exception {
+    public List<Long> getRunsDuringInterval(long startTime, long endTime) throws SchedulingException {
         List<Long> results = new ArrayList<>();
         if (event != null) {
             // if there's a solar offset, reset the start time to the beginning of the day so that
             // we can see if the event should run at any point during the first to subsequent days
             if (solarOffset != null) {
                 if (latitude == null || longitude == null) {
-                    logger.warn("Scheduled trigger \"{}\" has a solar offset but no Hub latitude/longitude has been set; no schedule can be calculated", getName());
-                    return results;
+                    throw new SchedulingException("Unable to calculate sunrise/sunset; please set Hub latitude/longitude");
                 }
                 Calendar c = Calendar.getInstance();
                 c.setTimeInMillis(startTime);
@@ -257,8 +257,12 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
                 if (solarOffset != null) {
                         Calendar c = Calendar.getInstance();
                         c.setTimeInMillis(time);
+                    try {
                         c = SolarHelper.createCalendar(c, solarOffset, latitude, longitude);
                         time = c.getTimeInMillis();
+                    } catch (ParseException e) {
+                        throw new SchedulingException("Error parsing solar offset", e);
+                    }
                 }
 
                 results.add(time);
