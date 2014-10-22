@@ -174,9 +174,11 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
 
     public void setScheduleFile(File scheduleFile) {
         this.scheduleFile = scheduleFile;
-
         restartFileWatcher();
+        reloadScheduleFile();
+    }
 
+    public void reloadScheduleFile() {
         if (scheduleFile != null) {
             try {
                 // create empty calendar file if it doesn't exist

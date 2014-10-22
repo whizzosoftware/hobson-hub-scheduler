@@ -74,6 +74,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
         if (config != null && config.get("latitude") != null && config.get("longitude") != null) {
             provider.setLatitude((String)config.get("latitude"));
             provider.setLongitude((String) config.get("longitude"));
+            triggerProvider.reloadScheduleFile();
         }
     }
 }
