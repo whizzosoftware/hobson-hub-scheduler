@@ -30,23 +30,25 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
     @Override
     public void init(Dictionary config) {
         // latitude and longitude are two configurable properties of this plugin
+        // define latitude and longitude as two configurable properties of this plugin
         addConfigurationMetaData(new ConfigurationMetaData("latitude", "Latitude", "The latitude of your location", ConfigurationMetaData.Type.STRING));
         addConfigurationMetaData(new ConfigurationMetaData("longitude", "Longitude", "The longitude of your location", ConfigurationMetaData.Type.STRING));
 
         // create an ical trigger provider
-        ICalTriggerProvider provider = new ICalTriggerProvider(getId());
-        applyProviderConfig(provider, config);
-        provider.setScheduleExecutor(new ThreadPoolScheduledTriggerExecutor());
-        provider.setScheduleFile(getDataFile("schedule.ics"));
+        triggerProvider = new ICalTriggerProvider(getId());
+        applyProviderConfig(triggerProvider, config);
+        triggerProvider.setScheduleExecutor(new ThreadPoolScheduledTriggerExecutor());
+        triggerProvider.setScheduleFile(getDataFile("schedule.ics"));
+        publishTriggerProvider(triggerProvider);
+        triggerProvider.start();
 
-        this.triggerProvider = provider;
-        publishTriggerProvider(provider);
-
+        // set the plugin to running status
         setStatus(new PluginStatus(PluginStatus.Status.RUNNING));
     }
 
     @Override
     public void stop() {
+        triggerProvider.stop();
     }
 
     @Override

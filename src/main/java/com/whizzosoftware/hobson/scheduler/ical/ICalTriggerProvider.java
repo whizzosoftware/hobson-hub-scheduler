@@ -120,14 +120,38 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
     protected boolean addTrigger(ICalTrigger trigger, long now, long endOfToday) throws Exception {
         logger.debug("Adding task {} with ID: {}", trigger.getName(), trigger.getId());
         triggerMap.put(trigger.getId(), trigger);
-        List<Long> todaysRunTimes = trigger.getRunsDuringInterval(now, endOfToday);
-        if (todaysRunTimes.size() > 0) {
-            long delayInMs = todaysRunTimes.get(0) - now;
-            if (delayInMs > 0) {
-                scheduleTrigger(trigger, delayInMs);
+        return scheduleNextRun(trigger, now, endOfToday);
+    }
+
+    protected boolean scheduleNextRun(ICalTrigger trigger, long now, long endOfToday) throws Exception {
+        // check if there are any runs in the next two days
+        List<Long> todaysRunTimes = trigger.getRunsDuringInterval(now, now + 86400000l);
+        // if not, check if there are any runs in the next 6 weeks
+        if (todaysRunTimes.size() == 0 || (todaysRunTimes.size() == 1 && todaysRunTimes.get(0) == now)) {
+            todaysRunTimes = trigger.getRunsDuringInterval(now, now + 3628800000l);
+            // it not, check if there are any runs in the next 53 weeks
+            if (todaysRunTimes.size() == 0 || (todaysRunTimes.size() == 1 && todaysRunTimes.get(0) == now)) {
+                todaysRunTimes = trigger.getRunsDuringInterval(now, now + 32054400000l);
             }
-            return true;
         }
+        if (todaysRunTimes != null && todaysRunTimes.size() > 0) {
+            long nextRunTime = 0;
+            for (Long l : todaysRunTimes) {
+                if (l - now > 0) {
+                    nextRunTime = l;
+                    break;
+                }
+            }
+            if (nextRunTime > 0) {
+                trigger.getProperties().put(ICalTrigger.PROP_NEXT_RUN_TIME, nextRunTime);
+                if (nextRunTime < endOfToday) {
+                    trigger.getProperties().put(ICalTrigger.PROP_SCHEDULED, true);
+                    executor.schedule(trigger, nextRunTime - now);
+                    return true;
+                }
+            }
+        }
+        trigger.getProperties().put(ICalTrigger.PROP_SCHEDULED, false);
         return false;
     }
 
@@ -241,19 +265,7 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
             try {
                 long endOfDay = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
                 logger.debug("Task is done executing; checking for any more runs between {} and {}", now, endOfDay);
-                List<Long> todayRuns = trigger.getRunsDuringInterval(now, endOfDay);
-                if (todayRuns != null) {
-                    Long nextRunTime = null;
-                    for (Long runTime : todayRuns) {
-                        if (runTime > now) {
-                            nextRunTime = runTime;
-                            break;
-                        }
-                    }
-                    if (nextRunTime != null) {
-                        scheduleTrigger(trigger, nextRunTime - now);
-                    }
-                }
+                scheduleNextRun(trigger, now, endOfDay);
             } catch (Exception e) {
                 logger.error("Unable to determine if task needs to run again today", e);
             }
@@ -297,7 +309,7 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
                 List<Long> runTimes = trigger.getRunsDuringInterval(startOfToday, endOfToday);
                 // if it should have run already, manually run it
                 if (runTimes != null && runTimes.size() > 0 && runTimes.get(0) < now) {
-                    trigger.run();
+                    trigger.run(now);
                 }
             }
         }
@@ -332,10 +344,5 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         } catch (Exception e) {
             logger.error("Error writing schedule file", e);
         }
-    }
-
-    protected void scheduleTrigger(ICalTrigger trigger, long delayInMs) {
-        trigger.getProperties().put("nextRunTime", System.currentTimeMillis() + delayInMs);
-        executor.schedule(trigger, delayInMs);
     }
 }

@@ -36,6 +36,8 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
     protected static final String PROP_SUN_OFFSET = "X-SUN-OFFSET";
+    protected static final String PROP_NEXT_RUN_TIME = "nextRunTime";
+    protected static final String PROP_SCHEDULED = "scheduled";
 
     private String providerId;
     private ActionManager actionManager;
@@ -203,11 +205,15 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
 
     @Override
     public void run() {
+        run(System.currentTimeMillis());
+    }
+
+    protected void run(long now) {
         try {
             logger.info("Trigger \"{}\" is executing", getName());
             executeActions();
             if (listener != null) {
-                listener.onTriggerExecuted(this, System.currentTimeMillis());
+                listener.onTriggerExecuted(this, now);
             }
         } catch (Exception e) {
             logger.error("Error executing trigger actions", e);
