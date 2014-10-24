@@ -28,7 +28,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
     }
 
     @Override
-    public void init(Dictionary config) {
+    public void onStartup(Dictionary config) {
         // latitude and longitude are two configurable properties of this plugin
         // define latitude and longitude as two configurable properties of this plugin
         addConfigurationMetaData(new ConfigurationMetaData("latitude", "Latitude", "The latitude of your location", ConfigurationMetaData.Type.STRING));
@@ -47,7 +47,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
     }
 
     @Override
-    public void stop() {
+    public void onShutdown() {
         triggerProvider.stop();
     }
 
