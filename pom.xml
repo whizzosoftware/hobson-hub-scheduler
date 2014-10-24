@@ -87,6 +87,12 @@
             <version>4.11</version>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-transport</artifactId>
+            <version>4.0.21.Final</version>
+            <scope>test</scope>
+        </dependency>
     </dependencies>
     <build>
         <plugins>
