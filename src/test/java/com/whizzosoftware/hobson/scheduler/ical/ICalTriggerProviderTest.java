@@ -12,6 +12,7 @@ import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTriggerExecutor
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import org.junit.Test;
 import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -20,7 +21,7 @@ import java.util.TimeZone;
 public class ICalTriggerProviderTest {
     @Test
     public void testloadCalendarWithNoExecutor() {
-        ICalTriggerProvider scheduler = new ICalTriggerProvider();
+        ICalTriggerProvider scheduler = new ICalTriggerProvider("pluginId");
         String s = "";
         try {
             scheduler.loadICSStream(new ByteArrayInputStream(s.getBytes()), System.currentTimeMillis());
@@ -34,7 +35,7 @@ public class ICalTriggerProviderTest {
         File sfile = File.createTempFile("hobsonschedule", ".ics");
         sfile.delete();
         try {
-            ICalTriggerProvider scheduler = new ICalTriggerProvider();
+            ICalTriggerProvider scheduler = new ICalTriggerProvider("pluginId");
             scheduler.setScheduleExecutor(new MockScheduledTriggerExecutor());
             scheduler.setScheduleFile(sfile);
         } finally {
@@ -63,7 +64,7 @@ public class ICalTriggerProviderTest {
 
         long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
 
-        ICalTriggerProvider s = new ICalTriggerProvider(tz);
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
@@ -94,7 +95,7 @@ public class ICalTriggerProviderTest {
         long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
 
         MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
-        ICalTriggerProvider s = new ICalTriggerProvider(tz);
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
@@ -121,6 +122,38 @@ public class ICalTriggerProviderTest {
     }
 
     @Test
+    public void testLoadScheduleWithSingleEventWithSunsetOffset() throws Exception {
+        TimeZone tz = TimeZone.getTimeZone("America/Denver");
+        String ical = "BEGIN:VCALENDAR\n" +
+                "VERSION:2.0\n" +
+                "BEGIN:VEVENT\n" +
+                "UID:uid1@example.com\n" +
+                "DTSTART:20141018T000000\n" +
+                "SUMMARY:My Task\n" +
+                "X-SUN-OFFSET: SS30\n" +
+                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]\n" +
+                "END:VEVENT\n" +
+                "END:VCALENDAR";
+
+        long startOfDay = DateHelper.getTime(tz, 2014, 10, 18, 0, 0, 0);
+
+        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        s.setLatitude(39.3722);
+        s.setLongitude(-104.8561);
+        s.setScheduleExecutor(executor);
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
+
+        // verify task was created
+        assertEquals(1, s.getTriggers().size());
+        ICalTrigger t = (ICalTrigger)s.getTriggers().iterator().next();
+        assertEquals("My Task", t.getName());
+
+        // verify task was scheduled -- should have been scheduled to execute in 61200 seconds (17 hours)
+        assertEquals(67560000, (long)executor.getDelayForTask(t));
+    }
+
+    @Test
     public void testDayReset() throws Exception {
         TimeZone tz = TimeZone.getTimeZone("GMT");
 
@@ -140,7 +173,7 @@ public class ICalTriggerProviderTest {
 
         MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
         MockActionManager actionContext = new MockActionManager();
-        ICalTriggerProvider s = new ICalTriggerProvider(tz);
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionContext);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), schedulerStart);
@@ -159,14 +192,14 @@ public class ICalTriggerProviderTest {
 
     @Test
     public void testDelayedDayReset() throws Exception {
-        TimeZone tz = TimeZone.getTimeZone("GMT");
+        TimeZone tz = TimeZone.getDefault();
 
         // an event that runs every day at midnight
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
                 "UID:uid1@example.com\n" +
-                "DTSTART:20140701T000000Z\n" +
+                "DTSTART:20140701T000000\n" +
                 "RRULE:FREQ=DAILY\n" +
                 "SUMMARY:My Task\n" +
                 "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
@@ -176,7 +209,7 @@ public class ICalTriggerProviderTest {
         // start the scheduler after the task should have run
         MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTriggerProvider s = new ICalTriggerProvider(tz);
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 17, 0, 0));
@@ -193,8 +226,118 @@ public class ICalTriggerProviderTest {
 
         // verify task was not scheduled but task executed
         assertEquals(1, s.getTriggers().size());
-        assertFalse(executor.isTriggerScheduled((ICalTrigger)s.getTriggers().iterator().next()));
+        ICalTrigger trigger = (ICalTrigger)s.getTriggers().iterator().next();
+        assertFalse(executor.isTriggerScheduled(trigger));
+        assertEquals(1404367200000l, trigger.getProperties().get(ICalTrigger.PROP_NEXT_RUN_TIME));
+        assertFalse((boolean)trigger.getProperties().get(ICalTrigger.PROP_SCHEDULED));
         assertEquals(1, actionManager.getLogCalls());
+    }
+
+    @Test
+    public void testDayResetWithSolarOffsetTrigger() throws Exception {
+        TimeZone tz = TimeZone.getDefault();
+
+        // an event that runs every day at midnight
+        String ical = "BEGIN:VCALENDAR\n" +
+                "VERSION:2.0\n" +
+                "BEGIN:VEVENT\n" +
+                "UID:uid1@example.com\n" +
+                "DTSTART:20140701T000000\n" +
+                "RRULE:FREQ=DAILY\n" +
+                "X-SUN-OFFSET:SS30\n" +
+                "SUMMARY:My Task\n" +
+                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
+                "END:VEVENT\n" +
+                "END:VCALENDAR";
+
+        // start the scheduler after the task should have run
+        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockActionManager actionManager = new MockActionManager();
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        s.setLatitude(39.3722);
+        s.setLongitude(-104.8561);
+        s.setScheduleExecutor(executor);
+        s.setActionManager(actionManager);
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
+
+        // verify task was not scheduled or executed
+        assertEquals(1, s.getTriggers().size());
+        ICalTrigger t = (ICalTrigger)s.getTriggers().iterator().next();
+        assertFalse(executor.isTriggerScheduled(t));
+        assertEquals(0, actionManager.getLogCalls());
+        assertNull(t.getProperties().getProperty(ICalTrigger.PROP_NEXT_RUN_TIME));
+
+        // start a new day at midnight
+        s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 0));
+
+        // verify task was scheduled at appropriate time and task did not execute
+        assertEquals(1, s.getTriggers().size());
+        t = (ICalTrigger)s.getTriggers().iterator().next();
+        assertTrue(executor.isTriggerScheduled(t));
+        assertEquals(75600000, (long) executor.getDelayForTask(t));
+        assertEquals(0, actionManager.getLogCalls());
+        assertEquals(1404356400000l, t.getProperties().get(ICalTrigger.PROP_NEXT_RUN_TIME));
+        assertTrue((boolean)t.getProperties().get(ICalTrigger.PROP_SCHEDULED));
+    }
+
+    @Test
+    public void testMonthlyNextRun() throws Exception {
+        TimeZone tz = TimeZone.getDefault();
+
+        // an event that runs every day at midnight
+        String ical = "BEGIN:VCALENDAR\n" +
+                "VERSION:2.0\n" +
+                "BEGIN:VEVENT\n" +
+                "UID:uid1@example.com\n" +
+                "DTSTART:20140701T220000\n" +
+                "RRULE:FREQ=MONTHLY\n" +
+                "SUMMARY:My Task\n" +
+                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
+                "END:VEVENT\n" +
+                "END:VCALENDAR";
+
+        // start the scheduler when the task should have run
+        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockActionManager actionManager = new MockActionManager();
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        s.setScheduleExecutor(executor);
+        s.setActionManager(actionManager);
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 23, 0, 0));
+
+        // verify trigger was created and its next run time
+        assertEquals(1, s.getTriggers().size());
+        ICalTrigger trigger = (ICalTrigger)s.getTriggers().iterator().next();
+        assertEquals(1406952000000l, trigger.getProperties().get(ICalTrigger.PROP_NEXT_RUN_TIME));
+    }
+
+    @Test
+    public void testYearlyNextRun() throws Exception {
+        TimeZone tz = TimeZone.getDefault();
+
+        // an event that runs every day at midnight
+        String ical = "BEGIN:VCALENDAR\n" +
+                "VERSION:2.0\n" +
+                "BEGIN:VEVENT\n" +
+                "UID:uid1@example.com\n" +
+                "DTSTART:20140701T220000\n" +
+                "RRULE:FREQ=YEARLY\n" +
+                "SUMMARY:My Task\n" +
+                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
+                "END:VEVENT\n" +
+                "END:VCALENDAR";
+
+        // start the scheduler when the task should have run
+        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockActionManager actionManager = new MockActionManager();
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        s.setScheduleExecutor(executor);
+        s.setActionManager(actionManager);
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 8, 1, 21, 0, 0));
+
+        // verify trigger was created and its next run time
+        assertEquals(1, s.getTriggers().size());
+        ICalTrigger trigger = (ICalTrigger)s.getTriggers().iterator().next();
+        assertEquals(1435809600000l, trigger.getProperties().get(ICalTrigger.PROP_NEXT_RUN_TIME));
     }
 
     @Test
@@ -223,7 +366,7 @@ public class ICalTriggerProviderTest {
 
         MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
         MockActionManager actionContext = new MockActionManager();
-        ICalTriggerProvider scheduler = new ICalTriggerProvider(tz);
+        ICalTriggerProvider scheduler = new ICalTriggerProvider("pluginId", tz);
         scheduler.setScheduleExecutor(executor);
         scheduler.setActionManager(actionContext);
 
@@ -244,5 +387,35 @@ public class ICalTriggerProviderTest {
         // verify that task was scheduled again
         assertTrue(executor.hasDelays());
         assertEquals(60000, (long)executor.getDelayForTask(trigger));
+    }
+
+    @Test
+    public void testSunOffsetWithNoLatLong() throws Exception {
+        TimeZone tz = TimeZone.getDefault();
+
+        // an event that runs every day at midnight
+        String ical = "BEGIN:VCALENDAR\n" +
+                "VERSION:2.0\n" +
+                "BEGIN:VEVENT\n" +
+                "UID:uid1@example.com\n" +
+                "DTSTART:20140701T000000\n" +
+                "RRULE:FREQ=DAILY\n" +
+                "X-SUN-OFFSET:SS30\n" +
+                "SUMMARY:My Task\n" +
+                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
+                "END:VEVENT\n" +
+                "END:VCALENDAR";
+
+        // start the scheduler after the task should have run
+        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockActionManager actionManager = new MockActionManager();
+        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        s.setScheduleExecutor(executor);
+        s.setActionManager(actionManager);
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
+
+        assertEquals(1, s.getTriggers().size());
+        ICalTrigger t = (ICalTrigger)s.getTriggers().iterator().next();
+        assertTrue(t.getProperties().containsKey(ICalTrigger.PROP_ERROR));
     }
 }

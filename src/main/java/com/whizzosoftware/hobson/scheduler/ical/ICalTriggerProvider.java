@@ -12,6 +12,7 @@ import com.whizzosoftware.hobson.api.trigger.HobsonTrigger;
 import com.whizzosoftware.hobson.api.trigger.TriggerProvider;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherListener;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherThread;
+import com.whizzosoftware.hobson.bootstrap.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.scheduler.TriggerExecutionListener;
 import com.whizzosoftware.hobson.scheduler.executor.ScheduledTriggerExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
@@ -48,23 +49,52 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
 
     private static final long MS_24_HOURS = 86400000;
 
-    private volatile ActionManager actionManager;
-
+    private String pluginId;
+    private ActionManager actionManager;
     private Calendar calendar;
     private ScheduledTriggerExecutor executor;
     private final Map<String,ICalTrigger> triggerMap = new HashMap<>();
     private File scheduleFile;
     private FileWatcherThread watcherThread;
     private ScheduledThreadPoolExecutor resetDayExecutor;
+    private Double latitude;
+    private Double longitude;
     private TimeZone timeZone;
     private boolean running = true;
 
-    public ICalTriggerProvider() {
-        timeZone = TimeZone.getDefault();
+    public ICalTriggerProvider(String pluginId) {
+        this(pluginId, TimeZone.getDefault());
     }
 
-    public ICalTriggerProvider(TimeZone timeZone) {
+    public ICalTriggerProvider(String pluginId, TimeZone timeZone) {
+        this.pluginId = pluginId;
         this.timeZone = timeZone;
+    }
+
+    @Override
+    public String getPluginId() {
+        return pluginId;
+    }
+
+    @Override
+    public String getId() {
+        return PROVIDER;
+    }
+
+    public Double getLatitude() {
+        return latitude;
+    }
+
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public Double getLongitude() {
+        return longitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
     }
 
     @Override
@@ -82,6 +112,8 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         try {
             JSONObject json = (JSONObject)trigger;
             ICalTrigger ict = new ICalTrigger(actionManager, PROVIDER, json);
+            ict.setLatitude(latitude);
+            ict.setLongitude(longitude);
             calendar.getComponents().add(ict.getVEvent());
             writeFile();
         } catch (Exception e) {
@@ -89,20 +121,76 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         }
     }
 
-    protected boolean addTrigger(ICalTrigger trigger, long now) throws Exception {
-        return addTrigger(trigger, now, DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis());
-    }
-
-    protected boolean addTrigger(ICalTrigger trigger, long now, long endOfToday) throws Exception {
+    /**
+     * Adds a new trigger.
+     *
+     * @param trigger the trigger to add
+     * @param now the current time
+     * @param wasDayReset indicates whether this is being done as part of a new day reset
+     *
+     * @return a boolean indicating whether the trigger should be run immediately
+     *
+     * @throws Exception on failure
+     */
+    protected boolean addTrigger(ICalTrigger trigger, long now, boolean wasDayReset) throws Exception {
         logger.debug("Adding task {} with ID: {}", trigger.getName(), trigger.getId());
         triggerMap.put(trigger.getId(), trigger);
-        List<Long> todaysRunTimes = trigger.getRunsDuringInterval(now, endOfToday);
-        if (todaysRunTimes.size() > 0) {
-            long delayInMs = todaysRunTimes.get(0) - now;
-            scheduleTrigger(trigger, delayInMs);
-            return true;
+        return scheduleNextRun(trigger, now, wasDayReset);
+    }
+
+    /**
+     * Schedules the next run of a trigger.
+     *
+     * @param trigger the trigger to schedule
+     * @param now the current time
+     * @param wasDayReset indicates whether this is being done as part of a new day reset
+     *
+     * @return a boolean indicating whether the trigger should be run immediately
+     *
+     * @throws Exception on failure
+     */
+    protected boolean scheduleNextRun(ICalTrigger trigger, long now, boolean wasDayReset) throws Exception {
+        long startOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 0, 0, 0, 0).getTimeInMillis();
+        long endOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
+        boolean shouldRunToday = false;
+
+        trigger.getProperties().put(ICalTrigger.PROP_SCHEDULED, false);
+
+        try {
+            // check if there is more than 1 run in the next two days
+            List<Long> todaysRunTimes = trigger.getRunsDuringInterval(startOfToday, startOfToday + 86400000l);
+            // if not, check if there is more than 1 run in the next 6 weeks
+            if (todaysRunTimes.size() < 2) {
+                todaysRunTimes = trigger.getRunsDuringInterval(startOfToday, startOfToday + 3628800000l);
+                // it not, check if there is more than 1 run in the next 53 weeks
+                if (todaysRunTimes.size() < 2) {
+                    todaysRunTimes = trigger.getRunsDuringInterval(startOfToday, startOfToday + 32054400000l);
+                }
+            }
+
+            if (todaysRunTimes.size() > 0) {
+                long nextRunTime = 0;
+                for (Long l : todaysRunTimes) {
+                    if (l - now < 0 && wasDayReset) {
+                        shouldRunToday = true;
+                    } else if (l - now > 0) {
+                        nextRunTime = l;
+                        break;
+                    }
+                }
+                if (nextRunTime > 0) {
+                    trigger.getProperties().put(ICalTrigger.PROP_NEXT_RUN_TIME, nextRunTime);
+                    if (nextRunTime < endOfToday) {
+                        trigger.getProperties().put(ICalTrigger.PROP_SCHEDULED, true);
+                        executor.schedule(trigger, nextRunTime - now);
+                    }
+                }
+            }
+        } catch (SchedulingException e) {
+            trigger.getProperties().put(ICalTrigger.PROP_ERROR, e.getLocalizedMessage());
         }
-        return false;
+
+        return shouldRunToday;
     }
 
     @Override
@@ -122,28 +210,34 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         }
     }
 
-    public void setScheduleFile(File scheduleFile) throws Exception {
+    public void setScheduleFile(File scheduleFile) {
         this.scheduleFile = scheduleFile;
-
         restartFileWatcher();
+        reloadScheduleFile();
+    }
 
+    public void reloadScheduleFile() {
         if (scheduleFile != null) {
-            // create empty calendar file if it doesn't exist
-            if (!scheduleFile.exists()) {
-                Calendar calendar = new Calendar();
-                calendar.getProperties().add(new ProdId("-//Whizzo Software//Hobson 1.0//EN"));
-                calendar.getProperties().add(Version.VERSION_2_0);
-                calendar.getProperties().add(CalScale.GREGORIAN);
-                VJournal entry = new VJournal(new Date(), "Created");
-                entry.getProperties().add(new Uid(UUID.randomUUID().toString()));
-                calendar.getComponents().add(entry);
-                CalendarOutputter outputter = new CalendarOutputter();
-                outputter.output(calendar, new FileOutputStream(scheduleFile));
-            }
+            try {
+                // create empty calendar file if it doesn't exist
+                if (!scheduleFile.exists()) {
+                    Calendar calendar = new Calendar();
+                    calendar.getProperties().add(new ProdId("-//Whizzo Software//Hobson 1.0//EN"));
+                    calendar.getProperties().add(Version.VERSION_2_0);
+                    calendar.getProperties().add(CalScale.GREGORIAN);
+                    VJournal entry = new VJournal(new Date(), "Created");
+                    entry.getProperties().add(new Uid(UUID.randomUUID().toString()));
+                    calendar.getComponents().add(entry);
+                    CalendarOutputter outputter = new CalendarOutputter();
+                    outputter.output(calendar, new FileOutputStream(scheduleFile));
+                }
 
-            // load the calendar file
-            logger.info("Scheduler loading file: {}", scheduleFile.getAbsolutePath());
-            loadICSStream(new FileInputStream(scheduleFile), System.currentTimeMillis());
+                // load the calendar file
+                logger.info("Scheduler loading file: {}", scheduleFile.getAbsolutePath());
+                loadICSStream(new FileInputStream(scheduleFile), System.currentTimeMillis());
+            } catch (Exception e) {
+                throw new HobsonRuntimeException("Error setting schedule file", e);
+            }
         }
     }
 
@@ -211,19 +305,7 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
             try {
                 long endOfDay = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
                 logger.debug("Task is done executing; checking for any more runs between {} and {}", now, endOfDay);
-                List<Long> todayRuns = trigger.getRunsDuringInterval(now, endOfDay);
-                if (todayRuns != null) {
-                    Long nextRunTime = null;
-                    for (Long runTime : todayRuns) {
-                        if (runTime > now) {
-                            nextRunTime = runTime;
-                            break;
-                        }
-                    }
-                    if (nextRunTime != null) {
-                        scheduleTrigger(trigger, nextRunTime - now);
-                    }
-                }
+                scheduleNextRun(trigger, now, false);
             } catch (Exception e) {
                 logger.error("Unable to determine if task needs to run again today", e);
             }
@@ -250,23 +332,16 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         clearAllTasks();
 
         // determine first & last milliseconds of today
-        long startOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 0, 0, 0, 0).getTimeInMillis();
-        long endOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
-
-        logger.debug("Checking task applicability between {} and {}", new Date(now), new Date(endOfToday));
 
         // iterate through all events and schedule them if they are supposed to run today
         ComponentList eventList = calendar.getComponents(Component.VEVENT);
         for (Object anEventList : eventList) {
             VEvent event = (VEvent)anEventList;
             ICalTrigger trigger = new ICalTrigger(actionManager, PROVIDER, event, this);
-            // if task wasn't added and it's a day reset, check if the task should have already run today
-            if (!addTrigger(trigger, now, endOfToday) && wasDayReset) {
-                List<Long> runTimes = trigger.getRunsDuringInterval(startOfToday, endOfToday);
-                // if it should have run already, manually run it
-                if (runTimes != null && runTimes.size() > 0 && runTimes.get(0) < now) {
-                    trigger.run();
-                }
+            trigger.setLatitude(latitude);
+            trigger.setLongitude(longitude);
+            if (addTrigger(trigger, now, wasDayReset)) {
+                trigger.run(now);
             }
         }
     }
@@ -300,10 +375,5 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         } catch (Exception e) {
             logger.error("Error writing schedule file", e);
         }
-    }
-
-    protected void scheduleTrigger(ICalTrigger trigger, long delayInMs) {
-        trigger.getProperties().put("nextRunTime", System.currentTimeMillis() + delayInMs);
-        executor.schedule(trigger, delayInMs);
     }
 }

@@ -10,7 +10,10 @@ package com.whizzosoftware.hobson.scheduler.ical;
 import com.whizzosoftware.hobson.api.action.HobsonActionRef;
 import com.whizzosoftware.hobson.api.action.manager.ActionManager;
 import com.whizzosoftware.hobson.api.trigger.HobsonTrigger;
+import com.whizzosoftware.hobson.bootstrap.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.scheduler.TriggerExecutionListener;
+import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
+import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.model.*;
 import net.fortuna.ical4j.model.component.VEvent;
 import net.fortuna.ical4j.model.property.*;
@@ -22,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.text.ParseException;
 import java.util.*;
+import java.util.Calendar;
 
 /**
  * An implementation of HobsonTrigger for iCal scheduled events.
@@ -31,12 +35,20 @@ import java.util.*;
 public class ICalTrigger implements HobsonTrigger, Runnable {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
+    protected static final String PROP_SUN_OFFSET = "X-SUN-OFFSET";
+    protected static final String PROP_NEXT_RUN_TIME = "nextRunTime";
+    protected static final String PROP_SCHEDULED = "scheduled";
+    protected static final String PROP_ERROR = "error";
+
     private String providerId;
     private ActionManager actionManager;
     private VEvent event;
     private final List<HobsonActionRef> actions = new ArrayList<>();
     private TriggerExecutionListener listener;
     private final Properties properties = new Properties();
+    private Double latitude;
+    private Double longitude;
+    private SolarOffset solarOffset;
 
     public ICalTrigger(ActionManager actionManager, String providerId, VEvent event, TriggerExecutionListener listener) throws InvalidVEventException {
         this.actionManager = actionManager;
@@ -44,8 +56,18 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
         this.event = event;
         this.listener = listener;
 
-        // parse actions
         if (event != null) {
+            // adjust start time if sun offset is set
+            Property sunOffset = event.getProperty(PROP_SUN_OFFSET);
+            if (sunOffset != null) {
+                try {
+                    solarOffset = new SolarOffset(sunOffset.getValue());
+                } catch (ParseException e) {
+                    throw new InvalidVEventException("Invalid X-SUN-OFFSET", e);
+                }
+            }
+
+            // parse actions
             Property commentProp = event.getProperty("COMMENT");
             if (commentProp != null) {
                 JSONArray arr = new JSONArray(new JSONTokener(commentProp.getValue()));
@@ -90,12 +112,15 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
                     if (jc.has("recurrence")) {
                         event.getProperties().add(new RRule(jc.getString("recurrence")));
                     }
+                    if (jc.has("sunOffset")) {
+                        event.getProperties().add(new XProperty(PROP_SUN_OFFSET, jc.getString("sunOffset")));
+                    }
                 } else {
-                    throw new RuntimeException("ICalTriggers only support one condition");
+                    throw new HobsonRuntimeException("ICalTriggers only support one condition");
                 }
             }
         } catch (ParseException e) {
-            throw new RuntimeException("Error parsing recurrence rule", e);
+            throw new HobsonRuntimeException("Error parsing recurrence rule", e);
         }
 
         try {
@@ -107,7 +132,7 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
                 }
             }
         } catch (Exception e) {
-            throw new RuntimeException("Error parsing actions", e);
+            throw new HobsonRuntimeException("Error parsing actions", e);
         }
     }
 
@@ -156,6 +181,10 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
         map.put("start", event.getStartDate().getValue());
         RRule rrule = (RRule)event.getProperty("RRULE");
         map.put("recurrence", rrule.getRecur().toString());
+        Property p = event.getProperty(PROP_SUN_OFFSET);
+        if (p != null) {
+            map.put("sunOffset", p.getValue());
+        }
         conditions.add(map);
         return conditions;
     }
@@ -177,35 +206,78 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
 
     @Override
     public void run() {
+        run(System.currentTimeMillis());
+    }
+
+    protected void run(long now) {
         try {
             logger.info("Trigger \"{}\" is executing", getName());
             executeActions();
             if (listener != null) {
-                listener.onTriggerExecuted(this, System.currentTimeMillis());
+                listener.onTriggerExecuted(this, now);
             }
         } catch (Exception e) {
             logger.error("Error executing trigger actions", e);
         }
     }
 
+    public void setLatitude(Double latitude) {
+        this.latitude = latitude;
+    }
+
+    public void setLongitude(Double longitude) {
+        this.longitude = longitude;
+    }
+
     public VEvent getVEvent() {
         return event;
     }
 
-    public List<Long> getRunsDuringInterval(long startTime, long endTime) throws Exception {
+    public List<Long> getRunsDuringInterval(long startTime, long endTime) throws SchedulingException {
         List<Long> results = new ArrayList<>();
         if (event != null) {
+            // if there's a solar offset, reset the start time to the beginning of the day so that
+            // we can see if the event should run at any point during the first to subsequent days
+            if (solarOffset != null) {
+                if (latitude == null || longitude == null) {
+                    throw new SchedulingException("Unable to calculate sunrise/sunset; please set Hub latitude/longitude");
+                }
+                Calendar c = Calendar.getInstance();
+                c.setTimeInMillis(startTime);
+                DateHelper.resetToBeginningOfDay(c);
+                startTime = c.getTimeInMillis();
+            }
+
             PeriodList periods = event.calculateRecurrenceSet(new Period(new DateTime(startTime), new DateTime(endTime)));
             for (Object period : periods) {
-                results.add(((Period) period).getStart().getTime());
+                // get the recurrence time
+                long time = ((Period)period).getStart().getTime();
+
+                // adjust time if there's an solar offset defined
+                if (solarOffset != null) {
+                        Calendar c = Calendar.getInstance();
+                        c.setTimeInMillis(time);
+                    try {
+                        c = SolarHelper.createCalendar(c, solarOffset, latitude, longitude);
+                        time = c.getTimeInMillis();
+                    } catch (ParseException e) {
+                        throw new SchedulingException("Error parsing solar offset", e);
+                    }
+                }
+
+                results.add(time);
             }
         }
         return results;
     }
 
     private void executeActions() {
-        for (HobsonActionRef ref : actions) {
-            actionManager.executeAction(ref.getPluginId(), ref.getActionId(), ref.getProperties());
+        if (actionManager != null) {
+            for (HobsonActionRef ref : actions) {
+                actionManager.executeAction(ref.getPluginId(), ref.getActionId(), ref.getProperties());
+            }
+        } else {
+            logger.error("No action manager is available to execute actions");
         }
     }
 
