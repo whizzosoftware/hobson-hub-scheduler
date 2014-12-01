@@ -7,12 +7,12 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.ical;
 
-import com.whizzosoftware.hobson.api.action.manager.ActionManager;
+import com.whizzosoftware.hobson.api.HobsonRuntimeException;
+import com.whizzosoftware.hobson.api.action.ActionManager;
 import com.whizzosoftware.hobson.api.trigger.HobsonTrigger;
 import com.whizzosoftware.hobson.api.trigger.TriggerProvider;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherListener;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherThread;
-import com.whizzosoftware.hobson.bootstrap.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.scheduler.TriggerExecutionListener;
 import com.whizzosoftware.hobson.scheduler.executor.ScheduledTriggerExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;

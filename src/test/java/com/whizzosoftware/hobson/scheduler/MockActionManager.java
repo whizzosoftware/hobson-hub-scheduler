@@ -7,8 +7,8 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler;
 
+import com.whizzosoftware.hobson.api.action.ActionManager;
 import com.whizzosoftware.hobson.api.action.HobsonAction;
-import com.whizzosoftware.hobson.api.action.manager.ActionManager;
 
 import java.util.Map;
 import java.util.Collection;
@@ -40,11 +40,13 @@ public class MockActionManager implements ActionManager {
         }
     }
 
-    public Collection<HobsonAction> getAllActions() {
+    @Override
+    public Collection<HobsonAction> getAllActions(String userId, String hubId) {
         return null;
     }
 
-    public HobsonAction getAction(String pluginId, String deviceId) {
+    @Override
+    public HobsonAction getAction(String userId, String hubId, String pluginId, String actionId) {
         return null;
     }
 }

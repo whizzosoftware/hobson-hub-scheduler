@@ -8,8 +8,8 @@
 package com.whizzosoftware.hobson.scheduler;
 
 import com.whizzosoftware.hobson.api.plugin.AbstractHobsonPlugin;
-import com.whizzosoftware.hobson.bootstrap.api.config.ConfigurationMetaData;
-import com.whizzosoftware.hobson.bootstrap.api.plugin.PluginStatus;
+import com.whizzosoftware.hobson.api.plugin.PluginStatus;
+import com.whizzosoftware.hobson.api.plugin.PluginType;
 import com.whizzosoftware.hobson.scheduler.executor.ThreadPoolScheduledTriggerExecutor;
 import com.whizzosoftware.hobson.scheduler.ical.ICalTriggerProvider;
 
@@ -29,11 +29,6 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
 
     @Override
     public void onStartup(Dictionary config) {
-        // latitude and longitude are two configurable properties of this plugin
-        // define latitude and longitude as two configurable properties of this plugin
-        addConfigurationMetaData(new ConfigurationMetaData("latitude", "Latitude", "The latitude of your location", ConfigurationMetaData.Type.STRING));
-        addConfigurationMetaData(new ConfigurationMetaData("longitude", "Longitude", "The longitude of your location", ConfigurationMetaData.Type.STRING));
-
         // create an ical trigger provider
         triggerProvider = new ICalTriggerProvider(getId());
         applyProviderConfig(triggerProvider, config, false);
@@ -52,12 +47,8 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
     }
 
     @Override
-    public long getRefreshInterval() {
-        return 0;
-    }
-
-    @Override
-    public void onRefresh() {
+    public PluginType getType() {
+        return PluginType.CORE;
     }
 
     @Override

@@ -7,7 +7,7 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler;
 
-import com.whizzosoftware.hobson.api.action.manager.ActionManager;
+import com.whizzosoftware.hobson.api.action.ActionManager;
 import com.whizzosoftware.hobson.api.trigger.TriggerProvider;
 import com.whizzosoftware.hobson.scheduler.executor.ThreadPoolScheduledTriggerExecutor;
 import com.whizzosoftware.hobson.scheduler.ical.ICalTriggerProvider;

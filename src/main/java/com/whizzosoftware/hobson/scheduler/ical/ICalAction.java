@@ -7,7 +7,7 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.ical;
 
-import com.whizzosoftware.hobson.api.action.manager.ActionManager;
+import com.whizzosoftware.hobson.api.action.ActionManager;
 import org.apache.commons.beanutils.MethodUtils;
 import org.json.JSONException;
 import org.json.JSONObject;

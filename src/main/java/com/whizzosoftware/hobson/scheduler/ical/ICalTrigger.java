@@ -7,10 +7,10 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.ical;
 
+import com.whizzosoftware.hobson.api.HobsonRuntimeException;
+import com.whizzosoftware.hobson.api.action.ActionManager;
 import com.whizzosoftware.hobson.api.action.HobsonActionRef;
-import com.whizzosoftware.hobson.api.action.manager.ActionManager;
 import com.whizzosoftware.hobson.api.trigger.HobsonTrigger;
-import com.whizzosoftware.hobson.bootstrap.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.scheduler.TriggerExecutionListener;
 import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;

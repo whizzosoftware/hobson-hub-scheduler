@@ -11,7 +11,6 @@ import com.whizzosoftware.hobson.scheduler.ical.ICalTrigger;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
 
 public class MockScheduledTriggerExecutor implements ScheduledTriggerExecutor {
     private Map<ICalTrigger,Long> delayMap = new HashMap<>();

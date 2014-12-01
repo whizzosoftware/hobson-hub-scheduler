@@ -53,7 +53,7 @@
         <dependency>
             <groupId>com.whizzosoftware.hobson.hub</groupId>
             <artifactId>hobson-hub-api</artifactId>
-            <version>0.1.5</version>
+            <version>0.1.7-SNAPSHOT</version>
             <scope>provided</scope>
         </dependency>
         <dependency>
@@ -113,8 +113,8 @@
                 <extensions>true</extensions>
                 <configuration>
                     <instructions>
-                        <Import-Package>org.osgi.framework,org.osgi.service.event,org.apache.felix.dm.*,org.slf4j,org.apache.commons.logging,javax.servlet.*,org.apache.felix.webconsole,org.json.*,com.whizzosoftware.hobson.bootstrap.api.*,com.whizzosoftware.hobson.api.*</Import-Package>
-                        <Bundle-Activator>com.whizzosoftware.hobson.api.activator.HobsonBundleActivator</Bundle-Activator>
+                        <Import-Package>org.osgi.framework,org.osgi.service.event,org.apache.felix.dm.*,org.slf4j,org.apache.commons.logging,org.json.*,com.whizzosoftware.hobson.api.*</Import-Package>
+                        <Bundle-Activator>com.whizzosoftware.hobson.api.osgi.activator.HobsonBundleActivator</Bundle-Activator>
                         <Embed-Dependency>ical4j;scope=compile|runtime,backport-util-concurrent;scope=compile|runtime,org.apache.servicemix.bundles.commons-beanutils;scope=compile|runtime,org.apache.servicemix.bundles.commons-lang;scope=compile|runtime,SunriseSunsetCalculator;scope=compile|runtime</Embed-Dependency>
                         <Provide-Capability>hobson.plugin=com.whizzosoftware.hobson.scheduler.SchedulerPlugin</Provide-Capability>
                     </instructions>
