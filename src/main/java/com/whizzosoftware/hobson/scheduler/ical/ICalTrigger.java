@@ -205,6 +205,11 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
     }
 
     @Override
+    public void execute() {
+        run();
+    }
+
+    @Override
     public void run() {
         run(System.currentTimeMillis());
     }
