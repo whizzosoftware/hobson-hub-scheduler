@@ -5,7 +5,7 @@
     <artifactId>hobson-hub-scheduler</artifactId>
     <version>0.1.5-SNAPSHOT</version>
     <packaging>bundle</packaging>
-    <name>Scheduler Plugin</name>
+    <name>Hobson Scheduler Plugin</name>
     <description>Provides the ability to create scheduled-based triggers.</description>
     <dependencies>
         <dependency>
@@ -117,6 +117,7 @@
                         <Bundle-Activator>com.whizzosoftware.hobson.api.osgi.activator.HobsonBundleActivator</Bundle-Activator>
                         <Embed-Dependency>ical4j;scope=compile|runtime,backport-util-concurrent;scope=compile|runtime,org.apache.servicemix.bundles.commons-beanutils;scope=compile|runtime,org.apache.servicemix.bundles.commons-lang;scope=compile|runtime,SunriseSunsetCalculator;scope=compile|runtime</Embed-Dependency>
                         <Provide-Capability>hobson.plugin=com.whizzosoftware.hobson.scheduler.SchedulerPlugin</Provide-Capability>
+                        <Bundle-Category>hobson-core-plugin</Bundle-Category>
                     </instructions>
                 </configuration>
             </plugin>
