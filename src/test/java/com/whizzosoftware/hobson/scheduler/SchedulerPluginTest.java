@@ -7,7 +7,7 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler;
 
-import com.whizzosoftware.hobson.scheduler.ical.ICalTriggerProvider;
+import com.whizzosoftware.hobson.scheduler.ical.ICalTaskProvider;
 import org.junit.Test;
 import static org.junit.Assert.*;
 
@@ -20,7 +20,7 @@ public class SchedulerPluginTest {
         Hashtable config = new Hashtable();
         config.put("latitude", "120");
         config.put("longitude", "130");
-        ICalTriggerProvider provider = new ICalTriggerProvider("id");
+        ICalTaskProvider provider = new ICalTaskProvider("id");
         assertNull(provider.getLatitude());
         assertNull(provider.getLongitude());
         p.applyProviderConfig(provider, config, false);
@@ -32,7 +32,7 @@ public class SchedulerPluginTest {
     public void testApplyProviderConfigEmpty() {
         SchedulerPlugin p = new SchedulerPlugin("id");
         Hashtable config = new Hashtable();
-        ICalTriggerProvider provider = new ICalTriggerProvider("id");
+        ICalTaskProvider provider = new ICalTaskProvider("id");
         assertNull(provider.getLatitude());
         assertNull(provider.getLongitude());
         p.applyProviderConfig(provider, config, false);

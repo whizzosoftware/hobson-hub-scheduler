@@ -8,7 +8,7 @@
 package com.whizzosoftware.hobson.scheduler.ical;
 
 /**
- * Exception thrown when an error occurs when attempting to schedule a trigger.
+ * Exception thrown when an error occurs when attempting to schedule a task.
  *
  * @author Dan Noguerol
  */

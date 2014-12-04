@@ -10,8 +10,8 @@ package com.whizzosoftware.hobson.scheduler;
 import com.whizzosoftware.hobson.api.plugin.AbstractHobsonPlugin;
 import com.whizzosoftware.hobson.api.plugin.PluginStatus;
 import com.whizzosoftware.hobson.api.plugin.PluginType;
-import com.whizzosoftware.hobson.scheduler.executor.ThreadPoolScheduledTriggerExecutor;
-import com.whizzosoftware.hobson.scheduler.ical.ICalTriggerProvider;
+import com.whizzosoftware.hobson.scheduler.executor.ThreadPoolScheduledTaskExecutor;
+import com.whizzosoftware.hobson.scheduler.ical.ICalTaskProvider;
 
 import java.util.Dictionary;
 
@@ -21,7 +21,7 @@ import java.util.Dictionary;
  * @author Dan Noguerol
  */
 public class SchedulerPlugin extends AbstractHobsonPlugin {
-    private ICalTriggerProvider triggerProvider;
+    private ICalTaskProvider taskProvider;
 
     public SchedulerPlugin(String pluginId) {
         super(pluginId);
@@ -29,13 +29,13 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
 
     @Override
     public void onStartup(Dictionary config) {
-        // create an ical trigger provider
-        triggerProvider = new ICalTriggerProvider(getId());
-        applyProviderConfig(triggerProvider, config, false);
-        triggerProvider.setScheduleExecutor(new ThreadPoolScheduledTriggerExecutor());
-        triggerProvider.setScheduleFile(getDataFile("schedule.ics"));
-        publishTriggerProvider(triggerProvider);
-        triggerProvider.start();
+        // create an ical task provider
+        taskProvider = new ICalTaskProvider(getId());
+        applyProviderConfig(taskProvider, config, false);
+        taskProvider.setScheduleExecutor(new ThreadPoolScheduledTaskExecutor());
+        taskProvider.setScheduleFile(getDataFile("schedule.ics"));
+        publishTaskProvider(taskProvider);
+        taskProvider.start();
 
         // set the plugin to running status
         setStatus(new PluginStatus(PluginStatus.Status.RUNNING));
@@ -43,7 +43,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
 
     @Override
     public void onShutdown() {
-        triggerProvider.stop();
+        taskProvider.stop();
     }
 
     @Override
@@ -53,7 +53,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
 
     @Override
     public void onPluginConfigurationUpdate(Dictionary dictionary) {
-        applyProviderConfig(triggerProvider, dictionary, true);
+        applyProviderConfig(taskProvider, dictionary, true);
     }
 
     @Override
@@ -61,7 +61,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
         return "Hobson Scheduler";
     }
 
-    protected void applyProviderConfig(ICalTriggerProvider provider, Dictionary config, boolean reload) {
+    protected void applyProviderConfig(ICalTaskProvider provider, Dictionary config, boolean reload) {
         if (config != null) {
             String newLatitudeS = (String)config.get("latitude");
             String newLongitudeS = (String)config.get("longitude");
@@ -72,7 +72,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
                     provider.setLatitude(newLatitude);
                     provider.setLongitude(newLongitude);
                     if (reload) {
-                        triggerProvider.reloadScheduleFile();
+                        taskProvider.reloadScheduleFile();
                     }
                 }
             }

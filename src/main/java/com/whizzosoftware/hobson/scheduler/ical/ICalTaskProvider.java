@@ -9,12 +9,12 @@ package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.api.action.ActionManager;
-import com.whizzosoftware.hobson.api.trigger.HobsonTrigger;
-import com.whizzosoftware.hobson.api.trigger.TriggerProvider;
+import com.whizzosoftware.hobson.api.task.HobsonTask;
+import com.whizzosoftware.hobson.api.task.TaskProvider;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherListener;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherThread;
-import com.whizzosoftware.hobson.scheduler.TriggerExecutionListener;
-import com.whizzosoftware.hobson.scheduler.executor.ScheduledTriggerExecutor;
+import com.whizzosoftware.hobson.scheduler.TaskExecutionListener;
+import com.whizzosoftware.hobson.scheduler.executor.ScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.data.CalendarBuilder;
 import net.fortuna.ical4j.data.CalendarOutputter;
@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
  *
  * @author Dan Noguerol
  */
-public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener, TriggerExecutionListener {
+public class ICalTaskProvider implements TaskProvider, FileWatcherListener, TaskExecutionListener {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
     public static final String PROVIDER = "com.whizzosoftware.hobson.hub.hobson-hub-scheduler";
@@ -52,8 +52,8 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
     private String pluginId;
     private ActionManager actionManager;
     private Calendar calendar;
-    private ScheduledTriggerExecutor executor;
-    private final Map<String,ICalTrigger> triggerMap = new HashMap<>();
+    private ScheduledTaskExecutor executor;
+    private final Map<String,ICalTask> taskMap = new HashMap<>();
     private File scheduleFile;
     private FileWatcherThread watcherThread;
     private ScheduledThreadPoolExecutor resetDayExecutor;
@@ -62,11 +62,11 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
     private TimeZone timeZone;
     private boolean running = true;
 
-    public ICalTriggerProvider(String pluginId) {
+    public ICalTaskProvider(String pluginId) {
         this(pluginId, TimeZone.getDefault());
     }
 
-    public ICalTriggerProvider(String pluginId, TimeZone timeZone) {
+    public ICalTaskProvider(String pluginId, TimeZone timeZone) {
         this.pluginId = pluginId;
         this.timeZone = timeZone;
     }
@@ -98,20 +98,20 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
     }
 
     @Override
-    synchronized public Collection<HobsonTrigger> getTriggers() {
-        return new ArrayList<HobsonTrigger>(triggerMap.values());
+    synchronized public Collection<HobsonTask> getTasks() {
+        return new ArrayList<HobsonTask>(taskMap.values());
     }
 
     @Override
-    synchronized public HobsonTrigger getTrigger(String triggerId) {
-        return triggerMap.get(triggerId);
+    synchronized public HobsonTask getTask(String taskId) {
+        return taskMap.get(taskId);
     }
 
     @Override
-    synchronized public void addTrigger(Object trigger) {
+    synchronized public void addTask(Object task) {
         try {
-            JSONObject json = (JSONObject)trigger;
-            ICalTrigger ict = new ICalTrigger(actionManager, PROVIDER, json);
+            JSONObject json = (JSONObject)task;
+            ICalTask ict = new ICalTask(actionManager, PROVIDER, json);
             ict.setLatitude(latitude);
             ict.setLongitude(longitude);
             calendar.getComponents().add(ict.getVEvent());
@@ -122,49 +122,49 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
     }
 
     /**
-     * Adds a new trigger.
+     * Adds a new task.
      *
-     * @param trigger the trigger to add
+     * @param task the task to add
      * @param now the current time
      * @param wasDayReset indicates whether this is being done as part of a new day reset
      *
-     * @return a boolean indicating whether the trigger should be run immediately
+     * @return a boolean indicating whether the task should be run immediately
      *
      * @throws Exception on failure
      */
-    protected boolean addTrigger(ICalTrigger trigger, long now, boolean wasDayReset) throws Exception {
-        logger.debug("Adding task {} with ID: {}", trigger.getName(), trigger.getId());
-        triggerMap.put(trigger.getId(), trigger);
-        return scheduleNextRun(trigger, now, wasDayReset);
+    protected boolean addTask(ICalTask task, long now, boolean wasDayReset) throws Exception {
+        logger.debug("Adding task {} with ID: {}", task.getName(), task.getId());
+        taskMap.put(task.getId(), task);
+        return scheduleNextRun(task, now, wasDayReset);
     }
 
     /**
-     * Schedules the next run of a trigger.
+     * Schedules the next run of a task.
      *
-     * @param trigger the trigger to schedule
+     * @param task the task to schedule
      * @param now the current time
      * @param wasDayReset indicates whether this is being done as part of a new day reset
      *
-     * @return a boolean indicating whether the trigger should be run immediately
+     * @return a boolean indicating whether the task should be run immediately
      *
      * @throws Exception on failure
      */
-    protected boolean scheduleNextRun(ICalTrigger trigger, long now, boolean wasDayReset) throws Exception {
+    protected boolean scheduleNextRun(ICalTask task, long now, boolean wasDayReset) throws Exception {
         long startOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 0, 0, 0, 0).getTimeInMillis();
         long endOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
         boolean shouldRunToday = false;
 
-        trigger.getProperties().put(ICalTrigger.PROP_SCHEDULED, false);
+        task.getProperties().put(ICalTask.PROP_SCHEDULED, false);
 
         try {
             // check if there is more than 1 run in the next two days
-            List<Long> todaysRunTimes = trigger.getRunsDuringInterval(startOfToday, startOfToday + 86400000l);
+            List<Long> todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 86400000l);
             // if not, check if there is more than 1 run in the next 6 weeks
             if (todaysRunTimes.size() < 2) {
-                todaysRunTimes = trigger.getRunsDuringInterval(startOfToday, startOfToday + 3628800000l);
+                todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 3628800000l);
                 // it not, check if there is more than 1 run in the next 53 weeks
                 if (todaysRunTimes.size() < 2) {
-                    todaysRunTimes = trigger.getRunsDuringInterval(startOfToday, startOfToday + 32054400000l);
+                    todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 32054400000l);
                 }
             }
 
@@ -179,34 +179,35 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
                     }
                 }
                 if (nextRunTime > 0) {
-                    trigger.getProperties().put(ICalTrigger.PROP_NEXT_RUN_TIME, nextRunTime);
+                    task.getProperties().put(ICalTask.PROP_NEXT_RUN_TIME, nextRunTime);
                     if (nextRunTime < endOfToday) {
-                        trigger.getProperties().put(ICalTrigger.PROP_SCHEDULED, true);
-                        executor.schedule(trigger, nextRunTime - now);
+                        task.getProperties().put(ICalTask.PROP_SCHEDULED, true);
+                        executor.schedule(task, nextRunTime - now);
                     }
                 }
             }
         } catch (SchedulingException e) {
-            trigger.getProperties().put(ICalTrigger.PROP_ERROR, e.getLocalizedMessage());
+            task.getProperties().put(ICalTask.PROP_ERROR, e.getLocalizedMessage());
         }
 
         return shouldRunToday;
     }
 
     @Override
-    synchronized public void updateTrigger(String triggerId, String name, Object data) {
+    synchronized public void updateTask(String taskId, String name, Object data) {
         // TODO
     }
 
     @Override
-    synchronized public void deleteTrigger(String triggerId) {
-        ICalTrigger trigger = triggerMap.get(triggerId);
-        if (trigger != null) {
-            // remove the trigger from the calendar and write out a new calendar file
-            calendar.getComponents().remove(trigger.getVEvent());
+    synchronized public void deleteTask(String taskId) {
+        ICalTask task = taskMap.get(taskId);
+        if (task != null) {
+            // remove the task from the calendar and write out a new calendar file
+            calendar.getComponents().remove(task.getVEvent());
+            taskMap.remove(taskId);
             writeFile();
         } else {
-            logger.error("Unable to find trigger for removal: {}", triggerId);
+            logger.error("Unable to find task for removal: {}", taskId);
         }
     }
 
@@ -241,7 +242,7 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         }
     }
 
-    public void setScheduleExecutor(ScheduledTriggerExecutor executor) {
+    public void setScheduleExecutor(ScheduledTaskExecutor executor) {
         this.executor = executor;
         executor.start();
     }
@@ -274,7 +275,7 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         executor.stop();
         executor = null;
 
-        triggerMap.clear();
+        taskMap.clear();
     }
 
     public void resetForNewDay(long now) {
@@ -299,13 +300,13 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
     }
 
     @Override
-    public void onTriggerExecuted(ICalTrigger trigger, long now) {
+    public void onTaskExecuted(ICalTask task, long now) {
         if (running) {
             // check if the task needs to execute again today
             try {
                 long endOfDay = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
                 logger.debug("Task is done executing; checking for any more runs between {} and {}", now, endOfDay);
-                scheduleNextRun(trigger, now, false);
+                scheduleNextRun(task, now, false);
             } catch (Exception e) {
                 logger.error("Unable to determine if task needs to run again today", e);
             }
@@ -315,7 +316,7 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
     synchronized protected void clearAllTasks() {
         logger.debug("Clearing all tasks");
         executor.cancelAll();
-        triggerMap.clear();
+        taskMap.clear();
     }
 
     synchronized protected void loadICSStream(InputStream is, long now) throws Exception {
@@ -337,11 +338,11 @@ public class ICalTriggerProvider implements TriggerProvider, FileWatcherListener
         ComponentList eventList = calendar.getComponents(Component.VEVENT);
         for (Object anEventList : eventList) {
             VEvent event = (VEvent)anEventList;
-            ICalTrigger trigger = new ICalTrigger(actionManager, PROVIDER, event, this);
-            trigger.setLatitude(latitude);
-            trigger.setLongitude(longitude);
-            if (addTrigger(trigger, now, wasDayReset)) {
-                trigger.run(now);
+            ICalTask task = new ICalTask(actionManager, PROVIDER, event, this);
+            task.setLatitude(latitude);
+            task.setLongitude(longitude);
+            if (addTask(task, now, wasDayReset)) {
+                task.run(now);
             }
         }
     }

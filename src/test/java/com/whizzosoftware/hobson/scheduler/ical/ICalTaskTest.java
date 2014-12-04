@@ -9,7 +9,7 @@ package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.api.action.HobsonActionRef;
 import com.whizzosoftware.hobson.scheduler.MockActionManager;
-import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTriggerExecutor;
+import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.data.CalendarBuilder;
 import net.fortuna.ical4j.model.Calendar;
@@ -36,13 +36,13 @@ import java.util.TimeZone;
 
 import static org.junit.Assert.*;
 
-public class ICalTriggerTest {
+public class ICalTaskTest {
     @Test
     public void testConstructorWithNoActions() throws Exception {
         VEvent event = new VEvent(new DateTime(), "task1");
         event.getProperties().add(new Uid("uid"));
         try {
-            new ICalTrigger(null, "", event, null);
+            new ICalTask(null, "", event, null);
             fail("Should have thrown exception");
         } catch (InvalidVEventException ignored) {
         }
@@ -53,12 +53,12 @@ public class ICalTriggerTest {
         VEvent event = new VEvent(new DateTime(), "task2");
         event.getProperties().add(new Uid("uid2"));
         event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
-        ICalTrigger trigger = new ICalTrigger(null, "", event, null);
-        assertEquals("uid2", trigger.getId());
-        assertEquals("task2", trigger.getName());
-        assertNotNull(trigger.getActions());
-        assertEquals(1, trigger.getActions().size());
-        HobsonActionRef action = trigger.getActions().iterator().next();
+        ICalTask task = new ICalTask(null, "", event, null);
+        assertEquals("uid2", task.getId());
+        assertEquals("task2", task.getName());
+        assertNotNull(task.getActions());
+        assertEquals(1, task.getActions().size());
+        HobsonActionRef action = task.getActions().iterator().next();
         assertEquals("log", action.getActionId());
         assertEquals("My Action", action.getName());
         assertEquals("com.whizzosoftware.hobson.server-api", action.getPluginId());
@@ -73,7 +73,7 @@ public class ICalTriggerTest {
         Recur recur = new Recur("FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13");
         event.getProperties().add(new RRule(recur));
 
-        ICalTrigger task = new ICalTrigger(null, "", event, null);
+        ICalTask task = new ICalTask(null, "", event, null);
 
         Collection<Map<String,Object>> conditions = task.getConditions();
         assertEquals(1, conditions.size());
@@ -91,9 +91,9 @@ public class ICalTriggerTest {
         event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
         Recur recur = new Recur("FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13");
         event.getProperties().add(new RRule(recur));
-        event.getProperties().add(new XProperty(ICalTrigger.PROP_SUN_OFFSET, "SS"));
+        event.getProperties().add(new XProperty(ICalTask.PROP_SUN_OFFSET, "SS"));
 
-        ICalTrigger task = new ICalTrigger(null, "", event, null);
+        ICalTask task = new ICalTask(null, "", event, null);
 
         Collection<Map<String,Object>> conditions = task.getConditions();
         assertEquals(1, conditions.size());
@@ -116,7 +116,7 @@ public class ICalTriggerTest {
         event.getProperties().add(new RRule(recur));
 
         // check from day before first occurrence
-        ICalTrigger task = new ICalTrigger(null, "", event, null);
+        ICalTask task = new ICalTask(null, "", event, null);
         List<Long> periods = task.getRunsDuringInterval(DateHelper.getTime(tz, 2001, 4, 12, 0, 0, 0), DateHelper.getTime(tz, 2001, 4, 14, 0, 0, 0));
         assertEquals(1, periods.size());
 
@@ -143,7 +143,7 @@ public class ICalTriggerTest {
         event.getProperties().add(new RRule(recur));
 
         // check from day before first occurrence
-        ICalTrigger task = new ICalTrigger(null, "", event, null);
+        ICalTask task = new ICalTask(null, "", event, null);
         List<Long> periods = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 6, 1, 9, 0, 0), DateHelper.getTime(tz, 2014, 8, 31, 23, 59, 59));
         assertEquals(31, periods.size());
         assertEquals(DateHelper.getTime(tz, 2014, 6, 1, 9, 0, 0), (long)periods.get(0));
@@ -182,8 +182,8 @@ public class ICalTriggerTest {
 
     @Test
     public void testJSONRuleConstruction() throws Exception {
-        ICalTriggerProvider provider = new ICalTriggerProvider("pluginId");
-        provider.setScheduleExecutor(new MockScheduledTriggerExecutor());
+        ICalTaskProvider provider = new ICalTaskProvider("pluginId");
+        provider.setScheduleExecutor(new MockScheduledTaskExecutor());
 
         // validate we start with a non-existent temp file
         File calendarFile = File.createTempFile("schedule", ".ics");
@@ -192,8 +192,8 @@ public class ICalTriggerTest {
 
         try {
             provider.setScheduleFile(calendarFile);
-            JSONObject json = new JSONObject(new JSONTokener("{'name':'My Trigger','conditions':[{'start':'20140701T100000','recurrence':'FREQ=MINUTELY;INTERVAL=1'}],'actions':[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'logentry'}}]}"));
-            provider.addTrigger(json);
+            JSONObject json = new JSONObject(new JSONTokener("{'name':'My Task','conditions':[{'start':'20140701T100000','recurrence':'FREQ=MINUTELY;INTERVAL=1'}],'actions':[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'logentry'}}]}"));
+            provider.addTask(json);
 
             // make sure the provider updated the rule file
             assertTrue(calendarFile.exists());
@@ -205,7 +205,7 @@ public class ICalTriggerTest {
 
             VEvent event = (VEvent)cal.getComponents().get(1);
             assertNotNull(event.getUid().getValue());
-            assertEquals("My Trigger", event.getSummary().getValue());
+            assertEquals("My Task", event.getSummary().getValue());
 
             assertEquals("20140701T100000", event.getProperties().getProperty("DTSTART").getValue());
             assertEquals("FREQ=MINUTELY;INTERVAL=1", event.getProperties().getProperty("RRULE").getValue());
@@ -226,8 +226,8 @@ public class ICalTriggerTest {
 
     @Test
     public void testJSONRuleConstructionWithSunOffset() throws Exception {
-        ICalTriggerProvider provider = new ICalTriggerProvider("pluginId");
-        provider.setScheduleExecutor(new MockScheduledTriggerExecutor());
+        ICalTaskProvider provider = new ICalTaskProvider("pluginId");
+        provider.setScheduleExecutor(new MockScheduledTaskExecutor());
 
         // validate we start with a non-existent temp file
         File calendarFile = File.createTempFile("schedule", ".ics");
@@ -236,8 +236,8 @@ public class ICalTriggerTest {
 
         try {
             provider.setScheduleFile(calendarFile);
-            JSONObject json = new JSONObject(new JSONTokener("{'name':'My Trigger','conditions':[{'start':'20140701T100000','recurrence':'FREQ=MINUTELY;INTERVAL=1','sunOffset':'SR'}],'actions':[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'logentry'}}]}"));
-            provider.addTrigger(json);
+            JSONObject json = new JSONObject(new JSONTokener("{'name':'My Task','conditions':[{'start':'20140701T100000','recurrence':'FREQ=MINUTELY;INTERVAL=1','sunOffset':'SR'}],'actions':[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'logentry'}}]}"));
+            provider.addTask(json);
 
             // make sure the provider updated the rule file
             assertTrue(calendarFile.exists());
@@ -249,11 +249,11 @@ public class ICalTriggerTest {
 
             VEvent event = (VEvent)cal.getComponents().get(1);
             assertNotNull(event.getUid().getValue());
-            assertEquals("My Trigger", event.getSummary().getValue());
+            assertEquals("My Task", event.getSummary().getValue());
 
             assertEquals("20140701T100000", event.getProperties().getProperty("DTSTART").getValue());
             assertEquals("FREQ=MINUTELY;INTERVAL=1", event.getProperties().getProperty("RRULE").getValue());
-            assertEquals("SR", event.getProperties().getProperty(ICalTrigger.PROP_SUN_OFFSET).getValue());
+            assertEquals("SR", event.getProperties().getProperty(ICalTask.PROP_SUN_OFFSET).getValue());
 
             assertNotNull(event.getProperties().getProperty("COMMENT"));
             JSONArray jarray = new JSONArray(new JSONTokener(event.getProperties().getProperty("COMMENT").getValue()));
@@ -276,30 +276,30 @@ public class ICalTriggerTest {
         VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
         event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
-        event.getProperties().add(new XProperty(ICalTrigger.PROP_SUN_OFFSET, "SS+30"));
+        event.getProperties().add(new XProperty(ICalTask.PROP_SUN_OFFSET, "SS+30"));
         Recur recur = new Recur("FREQ=DAILY;INTERVAL=1");
         event.getProperties().add(new RRule(recur));
 
-        ICalTrigger trigger = new ICalTrigger(am, "providerId", event, null);
-        trigger.setLatitude(39.3722);
-        trigger.setLongitude(-104.8561);
+        ICalTask task = new ICalTask(am, "providerId", event, null);
+        task.setLatitude(39.3722);
+        task.setLongitude(-104.8561);
 
-        List<Long> runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 10, 19, 23, 59, 59));
+        List<Long> runs = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 10, 19, 23, 59, 59));
         assertEquals(1, runs.size());
         assertEquals(1413765900000l, (long)runs.get(0));
 
-        runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 12, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 12, 19, 23, 59, 59));
+        runs = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 12, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 12, 19, 23, 59, 59));
         assertEquals(1, runs.size());
-        assertEquals(1419034080000l, (long)runs.get(0));
+        assertEquals(1419034080000l, (long) runs.get(0));
 
-        runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2015, 7, 19, 0, 0, 0), DateHelper.getTime(tz, 2015, 7, 19, 23, 59, 59));
+        runs = task.getRunsDuringInterval(DateHelper.getTime(tz, 2015, 7, 19, 0, 0, 0), DateHelper.getTime(tz, 2015, 7, 19, 23, 59, 59));
         assertEquals(1, runs.size());
         assertEquals(1437360780000l, (long)runs.get(0));
 
         // This one is interesting -- since we store the start time for events with a sun offset as midnight, this event
         // technically would have already run as it's strictly defined by the VEvent. However, with the sun offset the
         // start time is pushed until after the current time and it SHOULD run
-        runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 20, 16, 46, 0), DateHelper.getTime(tz, 2014, 10, 20, 23, 59, 59));
+        runs = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 20, 16, 46, 0), DateHelper.getTime(tz, 2014, 10, 20, 23, 59, 59));
         assertEquals(1, runs.size());
     }
 
@@ -310,15 +310,15 @@ public class ICalTriggerTest {
         VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
         event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
-        event.getProperties().add(new XProperty(ICalTrigger.PROP_SUN_OFFSET, "SS+30"));
+        event.getProperties().add(new XProperty(ICalTask.PROP_SUN_OFFSET, "SS+30"));
         Recur recur = new Recur("FREQ=DAILY;INTERVAL=1");
         event.getProperties().add(new RRule(recur));
 
-        ICalTrigger trigger = new ICalTrigger(am, "providerId", event, null);
+        ICalTask task = new ICalTask(am, "providerId", event, null);
 
         List<Long> runs = null;
         try {
-            runs = trigger.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 10, 19, 23, 59, 59));
+            runs = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 10, 19, 23, 59, 59));
             fail("Should have thrown exception");
         } catch (SchedulingException ignored) {}
     }

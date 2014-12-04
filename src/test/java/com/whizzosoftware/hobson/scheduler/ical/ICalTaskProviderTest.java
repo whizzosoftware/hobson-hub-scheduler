@@ -8,7 +8,7 @@
 package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.scheduler.MockActionManager;
-import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTriggerExecutor;
+import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -18,10 +18,10 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.util.TimeZone;
 
-public class ICalTriggerProviderTest {
+public class ICalTaskProviderTest {
     @Test
     public void testloadCalendarWithNoExecutor() {
-        ICalTriggerProvider scheduler = new ICalTriggerProvider("pluginId");
+        ICalTaskProvider scheduler = new ICalTaskProvider("pluginId");
         String s = "";
         try {
             scheduler.loadICSStream(new ByteArrayInputStream(s.getBytes()), System.currentTimeMillis());
@@ -35,8 +35,8 @@ public class ICalTriggerProviderTest {
         File sfile = File.createTempFile("hobsonschedule", ".ics");
         sfile.delete();
         try {
-            ICalTriggerProvider scheduler = new ICalTriggerProvider("pluginId");
-            scheduler.setScheduleExecutor(new MockScheduledTriggerExecutor());
+            ICalTaskProvider scheduler = new ICalTaskProvider("pluginId");
+            scheduler.setScheduleExecutor(new MockScheduledTaskExecutor());
             scheduler.setScheduleFile(sfile);
         } finally {
             sfile.delete();
@@ -46,7 +46,7 @@ public class ICalTriggerProviderTest {
     @Test
     public void testClearAllTasks() throws Exception {
         TimeZone tz = TimeZone.getTimeZone("GMT");
-        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
 
         // make sure executor has no delays already set
         assertFalse(executor.hasDelays());
@@ -64,7 +64,7 @@ public class ICalTriggerProviderTest {
 
         long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
 
-        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
@@ -94,14 +94,14 @@ public class ICalTriggerProviderTest {
         // assert what happens the day OF the event
         long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
 
-        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
-        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
         // verify task was created
-        assertEquals(1, s.getTriggers().size());
-        ICalTrigger t = (ICalTrigger)s.getTriggers().iterator().next();
+        assertEquals(1, s.getTasks().size());
+        ICalTask t = (ICalTask)s.getTasks().iterator().next();
         assertEquals("My Task", t.getName());
 
         // verify task was scheduled -- should have been scheduled to execute in 61200 seconds (17 hours)
@@ -113,10 +113,10 @@ public class ICalTriggerProviderTest {
         s.resetForNewDay(startOfDay);
 
         // verify the task was created but not scheduled
-        assertEquals(1, s.getTriggers().size());
+        assertEquals(1, s.getTasks().size());
 
         // verify task was not scheduled
-        assertFalse(executor.isTriggerScheduled((ICalTrigger)s.getTriggers().iterator().next()));
+        assertFalse(executor.isTaskScheduled((ICalTask) s.getTasks().iterator().next()));
         assertFalse(executor.hasDelays());
         assertNull(executor.getDelayForTask(t));
     }
@@ -137,16 +137,16 @@ public class ICalTriggerProviderTest {
 
         long startOfDay = DateHelper.getTime(tz, 2014, 10, 18, 0, 0, 0);
 
-        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
-        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
         s.setLatitude(39.3722);
         s.setLongitude(-104.8561);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
         // verify task was created
-        assertEquals(1, s.getTriggers().size());
-        ICalTrigger t = (ICalTrigger)s.getTriggers().iterator().next();
+        assertEquals(1, s.getTasks().size());
+        ICalTask t = (ICalTask)s.getTasks().iterator().next();
         assertEquals("My Task", t.getName());
 
         // verify task was scheduled -- should have been scheduled to execute in 61200 seconds (17 hours)
@@ -171,22 +171,22 @@ public class ICalTriggerProviderTest {
 
         long schedulerStart = DateHelper.getTime(tz, 2014, 7, 1, 8, 0, 0);
 
-        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionContext = new MockActionManager();
-        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionContext);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), schedulerStart);
 
         // verify task was created but not run
-        assertEquals(1, s.getTriggers().size());
+        assertEquals(1, s.getTasks().size());
         assertEquals(0, actionContext.getLogCalls());
 
         // reload the file at midnight
         s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 0));
 
         // verify task was created but not executed
-        assertEquals(1, s.getTriggers().size());
+        assertEquals(1, s.getTasks().size());
         assertEquals(0, actionContext.getLogCalls());
     }
 
@@ -207,16 +207,16 @@ public class ICalTriggerProviderTest {
                 "END:VCALENDAR";
 
         // start the scheduler after the task should have run
-        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 17, 0, 0));
 
         // verify task was not scheduled
-        assertEquals(1, s.getTriggers().size());
-        assertFalse(executor.isTriggerScheduled((ICalTrigger)s.getTriggers().iterator().next()));
+        assertEquals(1, s.getTasks().size());
+        assertFalse(executor.isTaskScheduled((ICalTask) s.getTasks().iterator().next()));
         assertEquals(0, actionManager.getLogCalls());
 
         // start a new day 30 seconds after midnight -- this covers the corner case where a delay causes the
@@ -225,16 +225,16 @@ public class ICalTriggerProviderTest {
         s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 30));
 
         // verify task was not scheduled but task executed
-        assertEquals(1, s.getTriggers().size());
-        ICalTrigger trigger = (ICalTrigger)s.getTriggers().iterator().next();
-        assertFalse(executor.isTriggerScheduled(trigger));
-        assertEquals(1404367200000l, trigger.getProperties().get(ICalTrigger.PROP_NEXT_RUN_TIME));
-        assertFalse((boolean)trigger.getProperties().get(ICalTrigger.PROP_SCHEDULED));
+        assertEquals(1, s.getTasks().size());
+        ICalTask task = (ICalTask)s.getTasks().iterator().next();
+        assertFalse(executor.isTaskScheduled(task));
+        assertEquals(1404367200000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
+        assertFalse((boolean)task.getProperties().get(ICalTask.PROP_SCHEDULED));
         assertEquals(1, actionManager.getLogCalls());
     }
 
     @Test
-    public void testDayResetWithSolarOffsetTrigger() throws Exception {
+    public void testDayResetWithSolarOffsetTask() throws Exception {
         TimeZone tz = TimeZone.getDefault();
 
         // an event that runs every day at midnight
@@ -251,9 +251,9 @@ public class ICalTriggerProviderTest {
                 "END:VCALENDAR";
 
         // start the scheduler after the task should have run
-        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
         s.setLatitude(39.3722);
         s.setLongitude(-104.8561);
         s.setScheduleExecutor(executor);
@@ -261,23 +261,23 @@ public class ICalTriggerProviderTest {
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
 
         // verify task was not scheduled or executed
-        assertEquals(1, s.getTriggers().size());
-        ICalTrigger t = (ICalTrigger)s.getTriggers().iterator().next();
-        assertFalse(executor.isTriggerScheduled(t));
+        assertEquals(1, s.getTasks().size());
+        ICalTask t = (ICalTask)s.getTasks().iterator().next();
+        assertFalse(executor.isTaskScheduled(t));
         assertEquals(0, actionManager.getLogCalls());
-        assertNull(t.getProperties().getProperty(ICalTrigger.PROP_NEXT_RUN_TIME));
+        assertNull(t.getProperties().getProperty(ICalTask.PROP_NEXT_RUN_TIME));
 
         // start a new day at midnight
         s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 0));
 
         // verify task was scheduled at appropriate time and task did not execute
-        assertEquals(1, s.getTriggers().size());
-        t = (ICalTrigger)s.getTriggers().iterator().next();
-        assertTrue(executor.isTriggerScheduled(t));
+        assertEquals(1, s.getTasks().size());
+        t = (ICalTask)s.getTasks().iterator().next();
+        assertTrue(executor.isTaskScheduled(t));
         assertEquals(75600000, (long) executor.getDelayForTask(t));
         assertEquals(0, actionManager.getLogCalls());
-        assertEquals(1404356400000l, t.getProperties().get(ICalTrigger.PROP_NEXT_RUN_TIME));
-        assertTrue((boolean)t.getProperties().get(ICalTrigger.PROP_SCHEDULED));
+        assertEquals(1404356400000l, t.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
+        assertTrue((boolean)t.getProperties().get(ICalTask.PROP_SCHEDULED));
     }
 
     @Test
@@ -297,17 +297,17 @@ public class ICalTriggerProviderTest {
                 "END:VCALENDAR";
 
         // start the scheduler when the task should have run
-        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 23, 0, 0));
 
-        // verify trigger was created and its next run time
-        assertEquals(1, s.getTriggers().size());
-        ICalTrigger trigger = (ICalTrigger)s.getTriggers().iterator().next();
-        assertEquals(1406952000000l, trigger.getProperties().get(ICalTrigger.PROP_NEXT_RUN_TIME));
+        // verify task was created and its next run time
+        assertEquals(1, s.getTasks().size());
+        ICalTask task = (ICalTask)s.getTasks().iterator().next();
+        assertEquals(1406952000000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
     }
 
     @Test
@@ -327,17 +327,17 @@ public class ICalTriggerProviderTest {
                 "END:VCALENDAR";
 
         // start the scheduler when the task should have run
-        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 8, 1, 21, 0, 0));
 
-        // verify trigger was created and its next run time
-        assertEquals(1, s.getTriggers().size());
-        ICalTrigger trigger = (ICalTrigger)s.getTriggers().iterator().next();
-        assertEquals(1435809600000l, trigger.getProperties().get(ICalTrigger.PROP_NEXT_RUN_TIME));
+        // verify task was created and its next run time
+        assertEquals(1, s.getTasks().size());
+        ICalTask task = (ICalTask)s.getTasks().iterator().next();
+        assertEquals(1435809600000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
     }
 
     @Test
@@ -364,9 +364,9 @@ public class ICalTriggerProviderTest {
                 "END:VEVENT\n" +
                 "END:VCALENDAR\n";
 
-        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionContext = new MockActionManager();
-        ICalTriggerProvider scheduler = new ICalTriggerProvider("pluginId", tz);
+        ICalTaskProvider scheduler = new ICalTaskProvider("pluginId", tz);
         scheduler.setScheduleExecutor(executor);
         scheduler.setActionManager(actionContext);
 
@@ -374,19 +374,19 @@ public class ICalTriggerProviderTest {
         scheduler.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 11, 0, 1));
 
         // verify task was created and scheduled
-        assertEquals(1, scheduler.getTriggers().size());
-        ICalTrigger trigger = (ICalTrigger)scheduler.getTriggers().iterator().next();
+        assertEquals(1, scheduler.getTasks().size());
+        ICalTask task = (ICalTask)scheduler.getTasks().iterator().next();
         assertEquals(0, actionContext.getLogCalls());
         assertTrue(executor.hasDelays());
-        assertEquals(59000, (long)executor.getDelayForTask(trigger));
+        assertEquals(59000, (long)executor.getDelayForTask(task));
 
         // force task to fire
         executor.clearDelays();
-        scheduler.onTriggerExecuted(trigger, DateHelper.getTime(tz, 2014, 7, 1, 11, 1, 0));
+        scheduler.onTaskExecuted(task, DateHelper.getTime(tz, 2014, 7, 1, 11, 1, 0));
 
         // verify that task was scheduled again
         assertTrue(executor.hasDelays());
-        assertEquals(60000, (long)executor.getDelayForTask(trigger));
+        assertEquals(60000, (long)executor.getDelayForTask(task));
     }
 
     @Test
@@ -407,15 +407,15 @@ public class ICalTriggerProviderTest {
                 "END:VCALENDAR";
 
         // start the scheduler after the task should have run
-        MockScheduledTriggerExecutor executor = new MockScheduledTriggerExecutor();
+        MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTriggerProvider s = new ICalTriggerProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
 
-        assertEquals(1, s.getTriggers().size());
-        ICalTrigger t = (ICalTrigger)s.getTriggers().iterator().next();
-        assertTrue(t.getProperties().containsKey(ICalTrigger.PROP_ERROR));
+        assertEquals(1, s.getTasks().size());
+        ICalTask t = (ICalTask)s.getTasks().iterator().next();
+        assertTrue(t.getProperties().containsKey(ICalTask.PROP_ERROR));
     }
 }

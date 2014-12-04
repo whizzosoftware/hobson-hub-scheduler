@@ -7,7 +7,7 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.executor;
 
-import com.whizzosoftware.hobson.scheduler.ical.ICalTrigger;
+import com.whizzosoftware.hobson.scheduler.ical.ICalTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,11 +23,11 @@ import java.util.concurrent.TimeUnit;
  *
  * @author Dan Noguerol
  */
-public class ThreadPoolScheduledTriggerExecutor implements ScheduledTriggerExecutor {
+public class ThreadPoolScheduledTaskExecutor implements ScheduledTaskExecutor {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
     private ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(3);
-    private Map<ICalTrigger,ScheduledFuture> futureMap = Collections.synchronizedMap(new HashMap<ICalTrigger,ScheduledFuture>());
+    private Map<ICalTask,ScheduledFuture> futureMap = Collections.synchronizedMap(new HashMap<ICalTask,ScheduledFuture>());
 
     @Override
     public void start() {
@@ -41,24 +41,24 @@ public class ThreadPoolScheduledTriggerExecutor implements ScheduledTriggerExecu
     }
 
     @Override
-    public void schedule(ICalTrigger trigger, long delayInMs) {
-        logger.debug("Scheduling task {} to run in {} seconds", trigger.getId(), delayInMs / 1000);
-        ScheduledFuture future = executor.schedule(trigger, delayInMs, TimeUnit.MILLISECONDS);
-        futureMap.put(trigger, future);
+    public void schedule(ICalTask task, long delayInMs) {
+        logger.debug("Scheduling task {} to run in {} seconds", task.getId(), delayInMs / 1000);
+        ScheduledFuture future = executor.schedule(task, delayInMs, TimeUnit.MILLISECONDS);
+        futureMap.put(task, future);
     }
 
     @Override
-    public boolean isTriggerScheduled(ICalTrigger trigger) {
-        return futureMap.containsKey(trigger);
+    public boolean isTaskScheduled(ICalTask task) {
+        return futureMap.containsKey(task);
     }
 
     @Override
-    public void cancel(ICalTrigger trigger) throws TriggerNotFoundException {
-        ScheduledFuture future = futureMap.get(trigger);
+    public void cancel(ICalTask task) throws TaskNotFoundException {
+        ScheduledFuture future = futureMap.get(task);
         if (future != null) {
             future.cancel(true);
         } else {
-            throw new TriggerNotFoundException();
+            throw new TaskNotFoundException();
         }
     }
 

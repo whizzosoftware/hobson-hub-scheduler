@@ -7,13 +7,13 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.executor;
 
-import com.whizzosoftware.hobson.scheduler.ical.ICalTrigger;
+import com.whizzosoftware.hobson.scheduler.ical.ICalTask;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class MockScheduledTriggerExecutor implements ScheduledTriggerExecutor {
-    private Map<ICalTrigger,Long> delayMap = new HashMap<>();
+public class MockScheduledTaskExecutor implements ScheduledTaskExecutor {
+    private Map<ICalTask,Long> delayMap = new HashMap<>();
 
     @Override
     public void start() {
@@ -24,18 +24,18 @@ public class MockScheduledTriggerExecutor implements ScheduledTriggerExecutor {
     }
 
     @Override
-    public void schedule(ICalTrigger trigger, long delayInMs) {
-        delayMap.put(trigger, delayInMs);
+    public void schedule(ICalTask task, long delayInMs) {
+        delayMap.put(task, delayInMs);
     }
 
     @Override
-    public boolean isTriggerScheduled(ICalTrigger trigger) {
-        return delayMap.containsKey(trigger);
+    public boolean isTaskScheduled(ICalTask task) {
+        return delayMap.containsKey(task);
     }
 
     @Override
-    public void cancel(ICalTrigger trigger) throws TriggerNotFoundException {
-        delayMap.remove(trigger);
+    public void cancel(ICalTask task) throws TaskNotFoundException {
+        delayMap.remove(task);
     }
 
     @Override
@@ -43,8 +43,8 @@ public class MockScheduledTriggerExecutor implements ScheduledTriggerExecutor {
         delayMap.clear();
     }
 
-    public Long getDelayForTask(ICalTrigger trigger) {
-        return delayMap.get(trigger);
+    public Long getDelayForTask(ICalTask task) {
+        return delayMap.get(task);
     }
 
     public boolean hasDelays() {

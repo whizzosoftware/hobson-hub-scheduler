@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A Runnable implementation for ICalEventTriggers that uses reflection to execute actions via an ActionManager.
+ * A Runnable implementation for ICalEventTasks that uses reflection to execute actions via an ActionManager.
  *
  * @author Dan Noguerol
  */

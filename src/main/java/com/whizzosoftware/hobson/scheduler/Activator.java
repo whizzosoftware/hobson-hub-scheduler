@@ -8,9 +8,9 @@
 package com.whizzosoftware.hobson.scheduler;
 
 import com.whizzosoftware.hobson.api.action.ActionManager;
-import com.whizzosoftware.hobson.api.trigger.TriggerProvider;
-import com.whizzosoftware.hobson.scheduler.executor.ThreadPoolScheduledTriggerExecutor;
-import com.whizzosoftware.hobson.scheduler.ical.ICalTriggerProvider;
+import com.whizzosoftware.hobson.api.task.TaskProvider;
+import com.whizzosoftware.hobson.scheduler.executor.ThreadPoolScheduledTaskExecutor;
+import com.whizzosoftware.hobson.scheduler.ical.ICalTaskProvider;
 import org.apache.felix.dm.Component;
 import org.apache.felix.dm.DependencyActivatorBase;
 import org.apache.felix.dm.DependencyManager;
@@ -32,18 +32,18 @@ public class Activator extends DependencyActivatorBase {
 
     @Override
     public void init(BundleContext context, DependencyManager manager) throws Exception {
-        serviceTracker = new ServiceTracker(context, TriggerProvider.class.getName(), new ServiceTrackerCustomizer() {
+        serviceTracker = new ServiceTracker(context, TaskProvider.class.getName(), new ServiceTrackerCustomizer() {
             @Override
             public Object addingService(ServiceReference serviceReference) {
                 logger.info("Adding service: {}", serviceReference.getBundle().getSymbolicName());
                 try {
                     BundleContext context = getBundleContext();
-                    TriggerProvider provider = (TriggerProvider)context.getService(serviceReference);
-                    if (provider instanceof ICalTriggerProvider) {
-                        ICalTriggerProvider scheduler = (ICalTriggerProvider)provider;
+                    TaskProvider provider = (TaskProvider)context.getService(serviceReference);
+                    if (provider instanceof ICalTaskProvider) {
+                        ICalTaskProvider scheduler = (ICalTaskProvider)provider;
 
                         // set schedule file
-                        scheduler.setScheduleExecutor(new ThreadPoolScheduledTriggerExecutor());
+                        scheduler.setScheduleExecutor(new ThreadPoolScheduledTaskExecutor());
                         scheduler.setScheduleFile(context.getDataFile("schedule.ics"));
                     }
                     return provider;
@@ -72,10 +72,10 @@ public class Activator extends DependencyActivatorBase {
 
         // add scheduler service
         Hashtable props = new Hashtable();
-        props.put("providerId", ICalTriggerProvider.PROVIDER);
+        props.put("providerId", ICalTaskProvider.PROVIDER);
         service = createComponent().
-            setInterface(TriggerProvider.class.getName(), props).
-            setImplementation(ICalTriggerProvider.class).
+            setInterface(TaskProvider.class.getName(), props).
+            setImplementation(ICalTaskProvider.class).
             add(createServiceDependency().setService(EventAdmin.class).setRequired(true)).
             add(createServiceDependency().setService(ActionManager.class).setRequired(true));
         manager.add(service);

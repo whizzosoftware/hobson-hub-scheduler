@@ -8,7 +8,7 @@
 package com.whizzosoftware.hobson.scheduler.ical;
 
 /**
- * Exception thrown when a ICalTriggerProvider is constructed with an invalid VEvent argument.
+ * Exception thrown when a ICalTaskProvider is constructed with an invalid VEvent argument.
  *
  * @author Dan Noguerol
  */

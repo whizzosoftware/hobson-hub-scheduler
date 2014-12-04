@@ -7,14 +7,14 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.executor;
 
-import com.whizzosoftware.hobson.scheduler.ical.ICalTrigger;
+import com.whizzosoftware.hobson.scheduler.ical.ICalTask;
 
 /**
  * An interface for classes that can schedule the execution of tasks.
  *
  * @author Dan Noguerol
  */
-public interface ScheduledTriggerExecutor {
+public interface ScheduledTaskExecutor {
     /**
      * Starts the task executor.
      */
@@ -26,30 +26,30 @@ public interface ScheduledTriggerExecutor {
     public void stop();
 
     /**
-     * Schedules a new trigger for execution. Note that this also sets the executorId for the trigger.
+     * Schedules a new task for execution. Note that this also sets the executorId for the task.
      *
-     * @param trigger the trigger to schedule
+     * @param task the task to schedule
      * @param delayInSeconds how many seconds to wait before executing the task
      */
-    public void schedule(ICalTrigger trigger, long delayInSeconds);
+    public void schedule(ICalTask task, long delayInSeconds);
 
     /**
-     * Indicates whether a trigger is scheduled for execution.
+     * Indicates whether a task is scheduled for execution.
      *
-     * @param trigger the trigger
+     * @param task the task
      *
      * @return a boolean
      */
-    public boolean isTriggerScheduled(ICalTrigger trigger);
+    public boolean isTaskScheduled(ICalTask task);
 
     /**
      * Cancels a task scheduled for execution.
      *
-     * @param trigger the trigger to cancel
+     * @param task the task to cancel
      *
-     * @throws TriggerNotFoundException on failure
+     * @throws TaskNotFoundException on failure
      */
-    public void cancel(ICalTrigger trigger) throws TriggerNotFoundException;
+    public void cancel(ICalTask task) throws TaskNotFoundException;
 
     /**
      * Cancels all tasks scheduled for execution.

@@ -12,5 +12,5 @@ To find out more and download ready-to-run installers, please visit the
 
 ### hobson-hub-scheduler
 
-The Scheduler plugin provides a way to create triggers based on timed events including 
+The Scheduler plugin provides a way to create tasks based on timed events including
 complex recurrence patterns.

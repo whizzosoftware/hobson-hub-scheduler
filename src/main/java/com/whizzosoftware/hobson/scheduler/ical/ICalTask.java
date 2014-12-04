@@ -10,8 +10,8 @@ package com.whizzosoftware.hobson.scheduler.ical;
 import com.whizzosoftware.hobson.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.api.action.ActionManager;
 import com.whizzosoftware.hobson.api.action.HobsonActionRef;
-import com.whizzosoftware.hobson.api.trigger.HobsonTrigger;
-import com.whizzosoftware.hobson.scheduler.TriggerExecutionListener;
+import com.whizzosoftware.hobson.api.task.HobsonTask;
+import com.whizzosoftware.hobson.scheduler.TaskExecutionListener;
 import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.model.*;
@@ -28,11 +28,11 @@ import java.util.*;
 import java.util.Calendar;
 
 /**
- * An implementation of HobsonTrigger for iCal scheduled events.
+ * An implementation of HobsonTask for iCal scheduled events.
  *
  * @author Dan Noguerol
  */
-public class ICalTrigger implements HobsonTrigger, Runnable {
+public class ICalTask implements HobsonTask, Runnable {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
     protected static final String PROP_SUN_OFFSET = "X-SUN-OFFSET";
@@ -44,13 +44,13 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
     private ActionManager actionManager;
     private VEvent event;
     private final List<HobsonActionRef> actions = new ArrayList<>();
-    private TriggerExecutionListener listener;
+    private TaskExecutionListener listener;
     private final Properties properties = new Properties();
     private Double latitude;
     private Double longitude;
     private SolarOffset solarOffset;
 
-    public ICalTrigger(ActionManager actionManager, String providerId, VEvent event, TriggerExecutionListener listener) throws InvalidVEventException {
+    public ICalTask(ActionManager actionManager, String providerId, VEvent event, TaskExecutionListener listener) throws InvalidVEventException {
         this.actionManager = actionManager;
         this.providerId = providerId;
         this.event = event;
@@ -80,14 +80,14 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
                     }
                 }
             } else {
-                throw new InvalidVEventException("ICalEventTrigger event must have a COMMENT property");
+                throw new InvalidVEventException("ICalEventTask event must have a COMMENT property");
             }
         } else {
-            throw new InvalidVEventException("ICalEventTrigger must have a non-null event");
+            throw new InvalidVEventException("ICalEventTask must have a non-null event");
         }
     }
 
-    public ICalTrigger(ActionManager actionManager, String providerId, JSONObject json) {
+    public ICalTask(ActionManager actionManager, String providerId, JSONObject json) {
         this.actionManager = actionManager;
         this.providerId = providerId;
 
@@ -116,7 +116,7 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
                         event.getProperties().add(new XProperty(PROP_SUN_OFFSET, jc.getString("sunOffset")));
                     }
                 } else {
-                    throw new HobsonRuntimeException("ICalTriggers only support one condition");
+                    throw new HobsonRuntimeException("ICalTasks only support one condition");
                 }
             }
         } catch (ParseException e) {
@@ -216,13 +216,13 @@ public class ICalTrigger implements HobsonTrigger, Runnable {
 
     protected void run(long now) {
         try {
-            logger.info("Trigger \"{}\" is executing", getName());
+            logger.info("Task \"{}\" is executing", getName());
             executeActions();
             if (listener != null) {
-                listener.onTriggerExecuted(this, now);
+                listener.onTaskExecuted(this, now);
             }
         } catch (Exception e) {
-            logger.error("Error executing trigger actions", e);
+            logger.error("Error executing task actions", e);
         }
     }
 

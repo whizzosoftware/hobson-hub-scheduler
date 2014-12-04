@@ -5,10 +5,12 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  *******************************************************************************/
-package com.whizzosoftware.hobson.scheduler;
+package com.whizzosoftware.hobson.scheduler.executor;
 
-import com.whizzosoftware.hobson.scheduler.ical.ICalTrigger;
-
-public interface TriggerExecutionListener {
-    public void onTriggerExecuted(ICalTrigger trigger, long now);
+/**
+ * Exception thrown when an operation expecting a task can't find one.
+ *
+ * @author Dan Noguerol
+ */
+public class TaskNotFoundException extends Exception {
 }
