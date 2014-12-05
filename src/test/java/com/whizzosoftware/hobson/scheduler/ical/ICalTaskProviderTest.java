@@ -382,7 +382,7 @@ public class ICalTaskProviderTest {
 
         // force task to fire
         executor.clearDelays();
-        scheduler.onTaskExecuted(task, DateHelper.getTime(tz, 2014, 7, 1, 11, 1, 0));
+        scheduler.onTaskExecuted(task, DateHelper.getTime(tz, 2014, 7, 1, 11, 1, 0), true);
 
         // verify that task was scheduled again
         assertTrue(executor.hasDelays());

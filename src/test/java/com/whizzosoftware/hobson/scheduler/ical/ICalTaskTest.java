@@ -192,6 +192,7 @@ public class ICalTaskTest {
 
         try {
             provider.setScheduleFile(calendarFile);
+            provider.reloadScheduleFile();
             JSONObject json = new JSONObject(new JSONTokener("{'name':'My Task','conditions':[{'start':'20140701T100000','recurrence':'FREQ=MINUTELY;INTERVAL=1'}],'actions':[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'logentry'}}]}"));
             provider.addTask(json);
 
@@ -236,6 +237,7 @@ public class ICalTaskTest {
 
         try {
             provider.setScheduleFile(calendarFile);
+            provider.reloadScheduleFile();
             JSONObject json = new JSONObject(new JSONTokener("{'name':'My Task','conditions':[{'start':'20140701T100000','recurrence':'FREQ=MINUTELY;INTERVAL=1','sunOffset':'SR'}],'actions':[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'logentry'}}]}"));
             provider.addTask(json);
 

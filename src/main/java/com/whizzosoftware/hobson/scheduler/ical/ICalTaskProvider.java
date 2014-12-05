@@ -60,7 +60,7 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
     private Double latitude;
     private Double longitude;
     private TimeZone timeZone;
-    private boolean running = true;
+    private boolean running = false;
 
     public ICalTaskProvider(String pluginId) {
         this(pluginId, TimeZone.getDefault());
@@ -213,8 +213,11 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
 
     public void setScheduleFile(File scheduleFile) {
         this.scheduleFile = scheduleFile;
-        restartFileWatcher();
-        reloadScheduleFile();
+
+        if (running) {
+            restartFileWatcher();
+            reloadScheduleFile();
+        }
     }
 
     public void reloadScheduleFile() {
@@ -244,7 +247,6 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
 
     public void setScheduleExecutor(ScheduledTaskExecutor executor) {
         this.executor = executor;
-        executor.start();
     }
 
     public void setActionManager(ActionManager actionManager) {
@@ -252,16 +254,25 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
     }
 
     public void start() {
-        long initialDelay = DateHelper.getMillisecondsUntilMidnight(System.currentTimeMillis(), timeZone);
+        if (!running) {
+            long initialDelay = DateHelper.getMillisecondsUntilMidnight(System.currentTimeMillis(), timeZone);
 
-        logger.info("New day will start in {} seconds", (initialDelay / 1000));
-        resetDayExecutor = new ScheduledThreadPoolExecutor(1);
-        resetDayExecutor.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                resetForNewDay(System.currentTimeMillis());
-            }
-        }, initialDelay, MS_24_HOURS, TimeUnit.MILLISECONDS);
+            executor.start();
+
+            restartFileWatcher();
+            reloadScheduleFile();
+
+            logger.info("New day will start in {} seconds", (initialDelay / 1000));
+            resetDayExecutor = new ScheduledThreadPoolExecutor(1);
+            resetDayExecutor.scheduleAtFixedRate(new Runnable() {
+                @Override
+                public void run() {
+                    resetForNewDay(System.currentTimeMillis());
+                }
+            }, initialDelay, MS_24_HOURS, TimeUnit.MILLISECONDS);
+
+            running = true;
+        }
     }
 
     public void stop() {
@@ -301,7 +312,18 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
 
     @Override
     public void onTaskExecuted(ICalTask task, long now) {
-        if (running) {
+        onTaskExecuted(task, now, false);
+    }
+
+    /**
+     * Callback when a task is executed.
+     *
+     * @param task the task that executed
+     * @param now the current time
+     * @param forceCheck post-process regardless of running state?
+     */
+    protected void onTaskExecuted(ICalTask task, long now, boolean forceCheck) {
+        if (running || forceCheck) {
             // check if the task needs to execute again today
             try {
                 long endOfDay = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
