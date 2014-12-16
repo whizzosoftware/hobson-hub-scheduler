@@ -237,7 +237,7 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
                 }
 
                 // load the calendar file
-                logger.info("Scheduler loading file: {}", scheduleFile.getAbsolutePath());
+                logger.debug("Scheduler loading file: {}", scheduleFile.getAbsolutePath());
                 loadICSStream(new FileInputStream(scheduleFile), System.currentTimeMillis());
             } catch (Exception e) {
                 throw new HobsonRuntimeException("Error setting schedule file", e);
@@ -262,7 +262,7 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
             restartFileWatcher();
             reloadScheduleFile();
 
-            logger.info("New day will start in {} seconds", (initialDelay / 1000));
+            logger.debug("New day will start in {} seconds", (initialDelay / 1000));
             resetDayExecutor = new ScheduledThreadPoolExecutor(1);
             resetDayExecutor.scheduleAtFixedRate(new Runnable() {
                 @Override
