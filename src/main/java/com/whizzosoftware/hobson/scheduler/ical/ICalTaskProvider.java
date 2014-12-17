@@ -13,6 +13,7 @@ import com.whizzosoftware.hobson.api.task.HobsonTask;
 import com.whizzosoftware.hobson.api.task.TaskProvider;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherListener;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherThread;
+import com.whizzosoftware.hobson.scheduler.DayResetListener;
 import com.whizzosoftware.hobson.scheduler.TaskExecutionListener;
 import com.whizzosoftware.hobson.scheduler.executor.ScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
@@ -49,6 +50,7 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
 
     private static final long MS_24_HOURS = 86400000;
 
+    private DayResetListener dayResetListener;
     private String pluginId;
     private ActionManager actionManager;
     private Calendar calendar;
@@ -62,13 +64,19 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
     private TimeZone timeZone;
     private boolean running = false;
 
-    public ICalTaskProvider(String pluginId) {
-        this(pluginId, TimeZone.getDefault());
+    public ICalTaskProvider(String pluginId, Double latitude, Double longitude) {
+        this(pluginId, latitude, longitude, TimeZone.getDefault());
     }
 
-    public ICalTaskProvider(String pluginId, TimeZone timeZone) {
+    public ICalTaskProvider(String pluginId, Double latitude, Double longitude, TimeZone timeZone) {
         this.pluginId = pluginId;
+        this.latitude = latitude;
+        this.longitude = longitude;
         this.timeZone = timeZone;
+    }
+
+    public void setDayResetListener(DayResetListener dayResetListener) {
+        this.dayResetListener = dayResetListener;
     }
 
     @Override
@@ -85,16 +93,14 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
         return latitude;
     }
 
-    public void setLatitude(Double latitude) {
-        this.latitude = latitude;
-    }
-
     public Double getLongitude() {
         return longitude;
     }
 
-    public void setLongitude(Double longitude) {
+    public void setLatitudeLongitude(Double latitude, Double longitude) {
+        this.latitude = latitude;
         this.longitude = longitude;
+        reloadScheduleFile();
     }
 
     @Override
@@ -290,6 +296,12 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
     }
 
     public void resetForNewDay(long now) {
+        // alert listener
+        if (dayResetListener != null) {
+            dayResetListener.onDayReset(now);
+        }
+
+        // refresh the internal calendar data to identify new tasks that should be scheduled
         try {
             refreshLocalCalendarData(now, true);
         } catch (Exception e) {

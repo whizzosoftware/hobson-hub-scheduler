@@ -7,21 +7,41 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler;
 
+import com.whizzosoftware.hobson.api.event.EventTopics;
+import com.whizzosoftware.hobson.api.event.HobsonEvent;
+import com.whizzosoftware.hobson.api.event.HubConfigurationUpdateEvent;
+import com.whizzosoftware.hobson.api.hub.HubLocation;
+import com.whizzosoftware.hobson.api.hub.HubManager;
 import com.whizzosoftware.hobson.api.plugin.AbstractHobsonPlugin;
 import com.whizzosoftware.hobson.api.plugin.PluginStatus;
 import com.whizzosoftware.hobson.api.plugin.PluginType;
+import com.whizzosoftware.hobson.api.util.UserUtil;
+import com.whizzosoftware.hobson.api.variable.HobsonVariable;
+import com.whizzosoftware.hobson.api.variable.VariableUpdate;
 import com.whizzosoftware.hobson.scheduler.executor.ThreadPoolScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.ical.ICalTaskProvider;
+import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.Dictionary;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 /**
  * Hobson plugin that provides scheduling capabilities.
  *
  * @author Dan Noguerol
  */
-public class SchedulerPlugin extends AbstractHobsonPlugin {
+public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetListener {
+    private static final Logger logger = LoggerFactory.getLogger(SchedulerPlugin.class);
+
+    private static final String SUNRISE = "sunrise";
+    private static final String SUNSET = "sunset";
+
     private ICalTaskProvider taskProvider;
+    private Double latitude;
+    private Double longitude;
 
     public SchedulerPlugin(String pluginId) {
         super(pluginId);
@@ -29,13 +49,30 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
 
     @Override
     public void onStartup(Dictionary config) {
+        // get latitude and longitude
+        HubLocation hl = getHubLocation();
+        latitude = hl.getLatitude();
+        longitude = hl.getLongitude();
+
         // create an ical task provider
-        taskProvider = new ICalTaskProvider(getId());
-        applyProviderConfig(taskProvider, config, false);
+        taskProvider = new ICalTaskProvider(getId(), latitude, longitude);
         taskProvider.setScheduleExecutor(new ThreadPoolScheduledTaskExecutor());
         taskProvider.setScheduleFile(getDataFile("schedule.ics"));
         publishTaskProvider(taskProvider);
         taskProvider.start();
+
+        // set the initial sunrise and sunset
+        String sunrise = null;
+        String sunset = null;
+        String ss[] = getSunriseSunset(System.currentTimeMillis());
+        if (ss != null) {
+            sunrise = ss[0];
+            sunset = ss[1];
+        }
+
+        // publish sunrise/sunset global variables
+        publishGlobalVariable(SUNRISE, sunrise, HobsonVariable.Mask.READ_ONLY);
+        publishGlobalVariable(SUNSET, sunset, HobsonVariable.Mask.READ_ONLY);
 
         // set the plugin to running status
         setStatus(new PluginStatus(PluginStatus.Status.RUNNING));
@@ -52,8 +89,12 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
     }
 
     @Override
+    public String[] getEventTopics() {
+        return new String[] {EventTopics.CONFIG_TOPIC};
+    }
+
+    @Override
     public void onPluginConfigurationUpdate(Dictionary dictionary) {
-        applyProviderConfig(taskProvider, dictionary, true);
     }
 
     @Override
@@ -61,21 +102,67 @@ public class SchedulerPlugin extends AbstractHobsonPlugin {
         return "Hobson Scheduler";
     }
 
-    protected void applyProviderConfig(ICalTaskProvider provider, Dictionary config, boolean reload) {
-        if (config != null) {
-            String newLatitudeS = (String)config.get("latitude");
-            String newLongitudeS = (String)config.get("longitude");
-            if (newLatitudeS != null && newLongitudeS != null) {
-                Double newLatitude = Double.parseDouble(newLatitudeS);
-                Double newLongitude = Double.parseDouble(newLongitudeS);
-                if (!newLatitude.equals(provider.getLatitude()) && !newLongitude.equals(provider.getLongitude())) {
-                    provider.setLatitude(newLatitude);
-                    provider.setLongitude(newLongitude);
-                    if (reload) {
-                        taskProvider.reloadScheduleFile();
-                    }
-                }
-            }
+    @Override
+    public void onHobsonEvent(HobsonEvent event) {
+        super.onHobsonEvent(event);
+
+        // update latitude and longitude if they've changed
+        if (event instanceof HubConfigurationUpdateEvent) {
+            HubLocation hl = getHubLocation();
+            updateLatitudeLongitude(hl.getLatitude(), hl.getLongitude());
+        }
+    }
+
+    @Override
+    public void onDayReset(long now) {
+        logger.debug("Day was reset - calculating sunrise/sunset");
+
+        // set global variables for sunrise and sunset at the start of each new day
+        updateSunriseSunset(now);
+    }
+
+    private HubLocation getHubLocation() {
+        return getHubManager().getHubLocation(UserUtil.DEFAULT_USER, UserUtil.DEFAULT_HUB);
+    }
+
+    private void updateLatitudeLongitude(Double latitude, Double longitude) {
+        if (this.latitude == null || !this.latitude.equals(latitude) || this.longitude == null || !this.longitude.equals(longitude)) {
+            logger.debug("Latitude and logitude have changed");
+            this.latitude = latitude;
+            this.longitude = longitude;
+            taskProvider.setLatitudeLongitude(latitude, longitude);
+            updateSunriseSunset(System.currentTimeMillis());
+        }
+    }
+
+    private void updateSunriseSunset(long now) {
+        if (latitude != null && longitude != null) {
+            String[] ss = getSunriseSunset(now);
+            String sunrise = ss[0];
+            String sunset = ss[1];
+            logger.debug("Sunrise: {}, sunset: {}", sunrise, sunset);
+
+            List<VariableUpdate> updates = new ArrayList<>();
+            updates.add(new VariableUpdate(getId(), SUNRISE, sunrise));
+            updates.add(new VariableUpdate(getId(), SUNSET, sunset));
+            fireVariableUpdateNotifications(updates);
+        }
+    }
+
+    private String[] getSunriseSunset(long now) {
+        if (latitude != null && longitude != null) {
+            Calendar c = Calendar.getInstance();
+            c.setTimeInMillis(now);
+
+            SolarHelper.SunriseSunsetCalendar ssc = SolarHelper.getSunriseSunsetCalendar(c, latitude, longitude);
+            DateFormat df = new SimpleDateFormat("HH:mmX");
+            df.setTimeZone(TimeZone.getDefault());
+
+            String sunrise = df.format(ssc.getSunrise().getTime());
+            String sunset = df.format(ssc.getSunset().getTime());
+            return new String[]{sunrise, sunset};
+        } else {
+            return null;
         }
     }
 }

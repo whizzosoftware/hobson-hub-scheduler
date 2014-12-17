@@ -182,7 +182,7 @@ public class ICalTaskTest {
 
     @Test
     public void testJSONRuleConstruction() throws Exception {
-        ICalTaskProvider provider = new ICalTaskProvider("pluginId");
+        ICalTaskProvider provider = new ICalTaskProvider("pluginId", null, null);
         provider.setScheduleExecutor(new MockScheduledTaskExecutor());
 
         // validate we start with a non-existent temp file
@@ -227,7 +227,7 @@ public class ICalTaskTest {
 
     @Test
     public void testJSONRuleConstructionWithSunOffset() throws Exception {
-        ICalTaskProvider provider = new ICalTaskProvider("pluginId");
+        ICalTaskProvider provider = new ICalTaskProvider("pluginId", null, null);
         provider.setScheduleExecutor(new MockScheduledTaskExecutor());
 
         // validate we start with a non-existent temp file

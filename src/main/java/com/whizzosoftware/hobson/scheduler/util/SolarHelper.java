@@ -28,6 +28,20 @@ public class SolarHelper {
     }
 
     /**
+     * Returns the sunrise/sunset calendars for a particular day and geographic location.
+     *
+     * @param today a Calendar for the day
+     * @param latitude the latitude
+     * @param longitude the longitude
+     *
+     * @return a SunriseSunsetCalendar instance
+     */
+    public static SunriseSunsetCalendar getSunriseSunsetCalendar(Calendar today, double latitude, double longitude) {
+        SunriseSunsetCalculator calc = new SunriseSunsetCalculator(new Location(latitude, longitude), today.getTimeZone());
+        return new SunriseSunsetCalendar(calc.getOfficialSunriseCalendarForDate(today), calc.getOfficialSunsetCalendarForDate(today));
+    }
+
+    /**
      * Creates a new Calendar based on a start date/time and a solar offset. The new Calendar will be on the same
      * date as the startDateTime argument but its time will be determined by the solar offset (a certain number of
      * minutes before or after sunrise or sunset).
@@ -45,11 +59,11 @@ public class SolarHelper {
         Calendar newCal;
 
         // perform the sunrise or sunset calculation
-        SunriseSunsetCalculator calc = new SunriseSunsetCalculator(new Location(latitude, longitude), startDateTime.getTimeZone());
+        SunriseSunsetCalendar ssc = getSunriseSunsetCalendar(startDateTime, latitude, longitude);
         if (offset.getType() == SolarOffset.Type.SUNSET) {
-            newCal = calc.getOfficialSunsetCalendarForDate(startDateTime);
+            newCal = ssc.getSunset();
         } else {
-            newCal = calc.getOfficialSunriseCalendarForDate(startDateTime);
+            newCal = ssc.getSunrise();
         }
 
         // add the offset
@@ -57,5 +71,23 @@ public class SolarHelper {
 
         // create and return a DtStart object with the offset time
         return newCal;
+    }
+
+    public static class SunriseSunsetCalendar {
+        private Calendar sunrise;
+        private Calendar sunset;
+
+        public SunriseSunsetCalendar(Calendar sunrise, Calendar sunset) {
+            this.sunrise = sunrise;
+            this.sunset = sunset;
+        }
+
+        public Calendar getSunrise() {
+            return sunrise;
+        }
+
+        public Calendar getSunset() {
+            return sunset;
+        }
     }
 }

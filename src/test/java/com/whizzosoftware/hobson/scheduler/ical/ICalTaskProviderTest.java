@@ -21,7 +21,7 @@ import java.util.TimeZone;
 public class ICalTaskProviderTest {
     @Test
     public void testloadCalendarWithNoExecutor() {
-        ICalTaskProvider scheduler = new ICalTaskProvider("pluginId");
+        ICalTaskProvider scheduler = new ICalTaskProvider("pluginId", null, null);
         String s = "";
         try {
             scheduler.loadICSStream(new ByteArrayInputStream(s.getBytes()), System.currentTimeMillis());
@@ -35,7 +35,7 @@ public class ICalTaskProviderTest {
         File sfile = File.createTempFile("hobsonschedule", ".ics");
         sfile.delete();
         try {
-            ICalTaskProvider scheduler = new ICalTaskProvider("pluginId");
+            ICalTaskProvider scheduler = new ICalTaskProvider("pluginId", null, null);
             scheduler.setScheduleExecutor(new MockScheduledTaskExecutor());
             scheduler.setScheduleFile(sfile);
         } finally {
@@ -64,7 +64,7 @@ public class ICalTaskProviderTest {
 
         long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
 
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
@@ -95,7 +95,7 @@ public class ICalTaskProviderTest {
         long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
 
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
@@ -138,9 +138,8 @@ public class ICalTaskProviderTest {
         long startOfDay = DateHelper.getTime(tz, 2014, 10, 18, 0, 0, 0);
 
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
-        s.setLatitude(39.3722);
-        s.setLongitude(-104.8561);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
+        s.setLatitudeLongitude(39.3722, -104.8561);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
@@ -173,7 +172,7 @@ public class ICalTaskProviderTest {
 
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionContext = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionContext);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), schedulerStart);
@@ -209,7 +208,7 @@ public class ICalTaskProviderTest {
         // start the scheduler after the task should have run
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 17, 0, 0));
@@ -253,9 +252,8 @@ public class ICalTaskProviderTest {
         // start the scheduler after the task should have run
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
-        s.setLatitude(39.3722);
-        s.setLongitude(-104.8561);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
+        s.setLatitudeLongitude(39.3722, -104.8561);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
@@ -299,7 +297,7 @@ public class ICalTaskProviderTest {
         // start the scheduler when the task should have run
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 23, 0, 0));
@@ -329,7 +327,7 @@ public class ICalTaskProviderTest {
         // start the scheduler when the task should have run
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 8, 1, 21, 0, 0));
@@ -366,7 +364,7 @@ public class ICalTaskProviderTest {
 
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionContext = new MockActionManager();
-        ICalTaskProvider scheduler = new ICalTaskProvider("pluginId", tz);
+        ICalTaskProvider scheduler = new ICalTaskProvider("pluginId", null, null, tz);
         scheduler.setScheduleExecutor(executor);
         scheduler.setActionManager(actionContext);
 
@@ -409,7 +407,7 @@ public class ICalTaskProviderTest {
         // start the scheduler after the task should have run
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", tz);
+        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
