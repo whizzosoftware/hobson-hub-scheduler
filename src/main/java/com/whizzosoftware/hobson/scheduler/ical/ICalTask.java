@@ -106,13 +106,13 @@ public class ICalTask implements HobsonTask, Runnable {
                 JSONArray conditions = json.getJSONArray("conditions");
                 if (conditions.length() == 1) {
                     JSONObject jc = conditions.getJSONObject(0);
-                    if (jc.has("start")) {
+                    if (jc.has("start") && !jc.isNull("start")) {
                         event.getProperties().add(new DtStart(jc.getString("start")));
                     }
-                    if (jc.has("recurrence")) {
+                    if (jc.has("recurrence") && !jc.isNull("recurrence")) {
                         event.getProperties().add(new RRule(jc.getString("recurrence")));
                     }
-                    if (jc.has("sunOffset")) {
+                    if (jc.has("sunOffset") && !jc.isNull("sunOffset")) {
                         event.getProperties().add(new XProperty(PROP_SUN_OFFSET, jc.getString("sunOffset")));
                     }
                 } else {
@@ -178,9 +178,13 @@ public class ICalTask implements HobsonTask, Runnable {
     public Collection<Map<String, Object>> getConditions() {
         List<Map<String,Object>> conditions = new ArrayList<>();
         Map<String,Object> map = new HashMap<>();
-        map.put("start", event.getStartDate().getValue());
+        if (event.getStartDate() != null) {
+            map.put("start", event.getStartDate().getValue());
+        }
         RRule rrule = (RRule)event.getProperty("RRULE");
-        map.put("recurrence", rrule.getRecur().toString());
+        if (rrule != null && rrule.getRecur() != null) {
+            map.put("recurrence", rrule.getRecur().toString());
+        }
         Property p = event.getProperty(PROP_SUN_OFFSET);
         if (p != null) {
             map.put("sunOffset", p.getValue());

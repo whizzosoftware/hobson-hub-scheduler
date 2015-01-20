@@ -10,12 +10,17 @@ package com.whizzosoftware.hobson.scheduler.ical;
 import com.whizzosoftware.hobson.scheduler.MockActionManager;
 import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
+import net.fortuna.ical4j.data.CalendarBuilder;
+import net.fortuna.ical4j.model.Calendar;
+import net.fortuna.ical4j.model.component.VEvent;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 import org.junit.Test;
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
+import java.io.*;
 import java.util.TimeZone;
 
 public class ICalTaskProviderTest {
@@ -54,7 +59,7 @@ public class ICalTaskProviderTest {
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
-                "UID:uid1@example.com\n" +
+                "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
                 "DTSTART:20130714T170000Z\n" +
                 "DTEND:20130714T170000Z\n" +
                 "SUMMARY:My Task\n" +
@@ -83,7 +88,7 @@ public class ICalTaskProviderTest {
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
-                "UID:uid1@example.com\n" +
+                "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
                 "DTSTART:20130714T170000Z\n" +
                 "DTEND:20130714T170000Z\n" +
                 "SUMMARY:My Task\n" +
@@ -122,12 +127,98 @@ public class ICalTaskProviderTest {
     }
 
     @Test
+    public void testEditEvent() throws Exception {
+        File file = File.createTempFile("hob", ".ics");
+        try {
+            String ical = "BEGIN:VCALENDAR\n" +
+                    "PRODID:-//Whizzo Software//Hobson 1.0//EN\n" +
+                    "VERSION:2.0\n" +
+                    "BEGIN:VEVENT\n" +
+                    "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
+                    "DTSTART:20130714T170000Z\n" +
+                    "DTEND:20130714T170000Z\n" +
+                    "SUMMARY:My Task\n" +
+                    "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]\n" +
+                    "END:VEVENT\n" +
+                    "END:VCALENDAR";
+
+            String ical2 = "BEGIN:VCALENDAR\n" +
+                    "PRODID:-//Whizzo Software//Hobson 1.0//EN\n" +
+                    "VERSION:2.0\n" +
+                    "BEGIN:VEVENT\n" +
+                    "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
+                    "DTSTART:20130714T170000Z\n" +
+                    "DTEND:20130714T170000Z\n" +
+                    "SUMMARY:My Edited Task\n" +
+                    "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Edited Action','properties':{'message':'foobar'}}]\n" +
+                    "END:VEVENT\n" +
+                    "END:VCALENDAR";
+
+            // write out ICS to temp file
+            FileWriter fw = new FileWriter(file);
+            fw.append(ical);
+            fw.close();
+
+            ICalTaskProvider p = new ICalTaskProvider("pluginId", null, null, TimeZone.getTimeZone("America/Denver"));
+            p.setScheduleExecutor(new MockScheduledTaskExecutor());
+            p.setScheduleFile(file);
+            p.start();
+
+            // make sure the task was created
+            assertEquals(1, p.getTasks().size());
+
+            // create task JSON
+            JSONObject json = new JSONObject();
+            json.put("name", "My Edited Task");
+            JSONArray conds = new JSONArray();
+            json.put("conditions", conds);
+            JSONObject cond = new JSONObject();
+            conds.put(cond);
+            cond.put("start", "20130714T170000Z");
+            JSONArray actions = new JSONArray();
+            json.put("actions", actions);
+            JSONObject action = new JSONObject();
+            actions.put(action);
+            action.put("pluginId", "com.whizzosoftware.hobson.server-api");
+            action.put("actionId", "log");
+            action.put("name", "My Edited Action");
+            JSONObject props = new JSONObject();
+            action.put("properties", props);
+            props.put("message", "foobar");
+
+            // update the task
+            p.updateTask("15dee4fe-a841-4cf6-8d7f-76c3ad5492b1", json);
+
+            assertTrue(file.exists());
+
+            // read back file
+            Calendar cal = new CalendarBuilder().build(new FileInputStream(file));
+            assertEquals(1, cal.getComponents().size());
+            VEvent c = (VEvent)cal.getComponents().get(0);
+            assertEquals("My Edited Task", c.getProperty("SUMMARY").getValue());
+            assertEquals("15dee4fe-a841-4cf6-8d7f-76c3ad5492b1", c.getProperty("UID").getValue());
+            assertEquals("20130714T170000Z", c.getProperty("DTSTART").getValue());
+            JSONArray aj = new JSONArray(new JSONTokener(c.getProperty("COMMENT").getValue()));
+            assertEquals(1, aj.length());
+            JSONObject cj = aj.getJSONObject(0);
+            assertEquals("com.whizzosoftware.hobson.server-api", cj.getString("pluginId"));
+            assertEquals("My Edited Action", cj.getString("name"));
+            assertEquals("log", cj.getString("actionId"));
+            assertTrue(cj.has("properties"));
+            JSONObject pj = cj.getJSONObject("properties");
+            assertEquals("foobar", pj.getString("message"));
+        } finally {
+            file.delete();
+        }
+    }
+
+    @Test
     public void testLoadScheduleWithSingleEventWithSunsetOffset() throws Exception {
         TimeZone tz = TimeZone.getTimeZone("America/Denver");
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
-                "UID:uid1@example.com\n" +
+                "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
                 "DTSTART:20141018T000000\n" +
                 "SUMMARY:My Task\n" +
                 "X-SUN-OFFSET: SS30\n" +
@@ -160,7 +251,7 @@ public class ICalTaskProviderTest {
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
-                "UID:uid1@example.com\n" +
+                "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
                 "DTSTART:20140701T090000Z\n" +
                 "RRULE:FREQ=DAILY\n" +
                 "SUMMARY:My Task\n" +
@@ -197,7 +288,7 @@ public class ICalTaskProviderTest {
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
-                "UID:uid1@example.com\n" +
+                "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
                 "DTSTART:20140701T000000\n" +
                 "RRULE:FREQ=DAILY\n" +
                 "SUMMARY:My Task\n" +
@@ -240,7 +331,7 @@ public class ICalTaskProviderTest {
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
-                "UID:uid1@example.com\n" +
+                "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
                 "DTSTART:20140701T000000\n" +
                 "RRULE:FREQ=DAILY\n" +
                 "X-SUN-OFFSET:SS30\n" +
@@ -286,7 +377,7 @@ public class ICalTaskProviderTest {
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
-                "UID:uid1@example.com\n" +
+                "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
                 "DTSTART:20140701T220000\n" +
                 "RRULE:FREQ=MONTHLY\n" +
                 "SUMMARY:My Task\n" +
@@ -316,7 +407,7 @@ public class ICalTaskProviderTest {
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
-                "UID:uid1@example.com\n" +
+                "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
                 "DTSTART:20140701T220000\n" +
                 "RRULE:FREQ=YEARLY\n" +
                 "SUMMARY:My Task\n" +
@@ -395,7 +486,7 @@ public class ICalTaskProviderTest {
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
-                "UID:uid1@example.com\n" +
+                "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
                 "DTSTART:20140701T000000\n" +
                 "RRULE:FREQ=DAILY\n" +
                 "X-SUN-OFFSET:SS30\n" +

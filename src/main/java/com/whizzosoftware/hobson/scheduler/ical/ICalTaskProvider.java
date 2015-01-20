@@ -7,6 +7,7 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.ical;
 
+import com.whizzosoftware.hobson.api.HobsonNotFoundException;
 import com.whizzosoftware.hobson.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.api.action.ActionManager;
 import com.whizzosoftware.hobson.api.task.HobsonTask;
@@ -200,8 +201,29 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
     }
 
     @Override
-    synchronized public void updateTask(String taskId, String name, Object data) {
-        // TODO
+    synchronized public void updateTask(String taskId, Object task) {
+        try {
+            // create new ical task
+            JSONObject json = (JSONObject)task;
+            json.put("id", taskId);
+            ICalTask newTask = new ICalTask(actionManager, PROVIDER, json);
+            newTask.setLatitude(latitude);
+            newTask.setLongitude(longitude);
+
+            ICalTask oldTask = taskMap.get(taskId);
+            if (oldTask != null) {
+                // remove old task
+                calendar.getComponents().remove(oldTask.getVEvent());
+                // add new task
+                calendar.getComponents().add(newTask.getVEvent());
+                taskMap.put(taskId, newTask);
+                writeFile();
+            } else {
+                throw new HobsonNotFoundException("The specified task was not found");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
