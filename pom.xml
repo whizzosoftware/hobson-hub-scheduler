@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.whizzosoftware.hobson.hub</groupId>
     <artifactId>hobson-hub-scheduler</artifactId>
-    <version>0.3.0-SNAPSHOT</version>
+    <version>0.3.0</version>
     <packaging>bundle</packaging>
     <name>Hobson Scheduler Plugin</name>
     <description>Provides the ability to create scheduled-based tasks.</description>
@@ -149,7 +149,7 @@
     <scm>
         <connection>scm:git:ssh://git@github.com/whizzosoftware/hobson-hub-scheduler.git</connection>
         <developerConnection>scm:git:ssh://git@github.com/whizzosoftware/hobson-hub-scheduler.git</developerConnection>
-        <tag>HEAD</tag>
+        <tag>hobson-hub-scheduler-0.3.0</tag>
     </scm>
     <distributionManagement>
         <repository>
