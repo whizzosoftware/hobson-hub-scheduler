@@ -15,6 +15,7 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.TimeZone;
 
 /**
  * A start date/time relative to sunrise or sunset.
@@ -71,6 +72,23 @@ public class SolarHelper {
 
         // create and return a DtStart object with the offset time
         return newCal;
+    }
+
+    public static String[] getSunriseSunset(Double latitude, Double longitude, long now) {
+        if (latitude != null && longitude != null) {
+            Calendar c = Calendar.getInstance();
+            c.setTimeInMillis(now);
+
+            SolarHelper.SunriseSunsetCalendar ssc = SolarHelper.getSunriseSunsetCalendar(c, latitude, longitude);
+            DateFormat df = new SimpleDateFormat("HH:mmX");
+            df.setTimeZone(TimeZone.getDefault());
+
+            String sunrise = df.format(ssc.getSunrise().getTime());
+            String sunset = df.format(ssc.getSunset().getTime());
+            return new String[]{sunrise, sunset};
+        } else {
+            return null;
+        }
     }
 
     public static class SunriseSunsetCalendar {

@@ -39,4 +39,12 @@ public class SolarHelperTest {
         assertEquals("20141018T081200Z-0600", SolarHelper.createDateString(c, new SolarOffset("SR+60"), 39.3722, -104.8561));
         assertEquals("20141018T061200Z-0600", SolarHelper.createDateString(c, new SolarOffset("SR-60"), 39.3722, -104.8561));
     }
+
+    @Test
+    public void testGetSunriseSunset() {
+        String[] s = SolarHelper.getSunriseSunset(39.3722, -104.8561, 1422549445956l);
+        assertEquals(2, s.length);
+        assertEquals("07:10-07", s[0]);
+        assertEquals("17:16-07", s[1]);
+    }
 }

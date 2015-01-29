@@ -64,7 +64,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
         // set the initial sunrise and sunset
         String sunrise = null;
         String sunset = null;
-        String ss[] = getSunriseSunset(System.currentTimeMillis());
+        String ss[] = SolarHelper.getSunriseSunset(latitude, longitude, System.currentTimeMillis());
         if (ss != null) {
             sunrise = ss[0];
             sunset = ss[1];
@@ -137,7 +137,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
 
     private void updateSunriseSunset(long now) {
         if (latitude != null && longitude != null) {
-            String[] ss = getSunriseSunset(now);
+            String[] ss = SolarHelper.getSunriseSunset(latitude, longitude, now);
             String sunrise = ss[0];
             String sunset = ss[1];
             logger.debug("Sunrise: {}, sunset: {}", sunrise, sunset);
@@ -146,23 +146,6 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
             updates.add(new VariableUpdate(getId(), SUNRISE, sunrise));
             updates.add(new VariableUpdate(getId(), SUNSET, sunset));
             fireVariableUpdateNotifications(updates);
-        }
-    }
-
-    private String[] getSunriseSunset(long now) {
-        if (latitude != null && longitude != null) {
-            Calendar c = Calendar.getInstance();
-            c.setTimeInMillis(now);
-
-            SolarHelper.SunriseSunsetCalendar ssc = SolarHelper.getSunriseSunsetCalendar(c, latitude, longitude);
-            DateFormat df = new SimpleDateFormat("HH:mmX");
-            df.setTimeZone(TimeZone.getDefault());
-
-            String sunrise = df.format(ssc.getSunrise().getTime());
-            String sunset = df.format(ssc.getSunset().getTime());
-            return new String[]{sunrise, sunset};
-        } else {
-            return null;
         }
     }
 }
