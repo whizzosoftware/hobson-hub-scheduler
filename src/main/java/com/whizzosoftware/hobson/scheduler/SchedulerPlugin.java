@@ -7,11 +7,11 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler;
 
+import com.whizzosoftware.hobson.api.config.Configuration;
 import com.whizzosoftware.hobson.api.event.EventTopics;
 import com.whizzosoftware.hobson.api.event.HobsonEvent;
 import com.whizzosoftware.hobson.api.event.HubConfigurationUpdateEvent;
 import com.whizzosoftware.hobson.api.hub.HubLocation;
-import com.whizzosoftware.hobson.api.hub.HubManager;
 import com.whizzosoftware.hobson.api.plugin.AbstractHobsonPlugin;
 import com.whizzosoftware.hobson.api.plugin.PluginStatus;
 import com.whizzosoftware.hobson.api.plugin.PluginType;
@@ -24,8 +24,6 @@ import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
 /**
@@ -48,7 +46,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     }
 
     @Override
-    public void onStartup(Dictionary config) {
+    public void onStartup(Configuration config) {
         // get latitude and longitude
         HubLocation hl = getHubLocation();
         latitude = hl.getLatitude();
@@ -81,6 +79,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     @Override
     public void onShutdown() {
         taskProvider.stop();
+        super.onShutdown();
     }
 
     @Override
@@ -94,7 +93,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     }
 
     @Override
-    public void onPluginConfigurationUpdate(Dictionary dictionary) {
+    public void onPluginConfigurationUpdate(Configuration config) {
     }
 
     @Override

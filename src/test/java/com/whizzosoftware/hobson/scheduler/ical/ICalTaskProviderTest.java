@@ -7,7 +7,7 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.ical;
 
-import com.whizzosoftware.hobson.scheduler.MockActionManager;
+import com.whizzosoftware.hobson.api.action.MockActionManager;
 import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.data.CalendarBuilder;

@@ -11,6 +11,7 @@ import com.whizzosoftware.hobson.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.api.action.ActionManager;
 import com.whizzosoftware.hobson.api.action.HobsonActionRef;
 import com.whizzosoftware.hobson.api.task.HobsonTask;
+import com.whizzosoftware.hobson.api.util.UserUtil;
 import com.whizzosoftware.hobson.scheduler.TaskExecutionListener;
 import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
@@ -287,7 +288,7 @@ public class ICalTask implements HobsonTask, Runnable {
     private void executeActions() {
         if (actionManager != null) {
             for (HobsonActionRef ref : actions) {
-                actionManager.executeAction(ref.getPluginId(), ref.getActionId(), ref.getProperties());
+                actionManager.executeAction(UserUtil.DEFAULT_USER, UserUtil.DEFAULT_HUB, ref.getPluginId(), ref.getActionId(), ref.getProperties());
             }
         } else {
             logger.error("No action manager is available to execute actions");
