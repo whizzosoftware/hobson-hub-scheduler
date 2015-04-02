@@ -121,7 +121,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     }
 
     private HubLocation getHubLocation() {
-        return getHubManager().getHubLocation(UserUtil.DEFAULT_USER, UserUtil.DEFAULT_HUB);
+        return getHub().getLocation();
     }
 
     private void updateLatitudeLongitude(Double latitude, Double longitude) {
