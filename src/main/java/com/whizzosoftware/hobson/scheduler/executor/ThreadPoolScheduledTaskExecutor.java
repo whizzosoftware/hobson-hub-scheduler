@@ -42,7 +42,7 @@ public class ThreadPoolScheduledTaskExecutor implements ScheduledTaskExecutor {
 
     @Override
     public void schedule(ICalTask task, long delayInMs) {
-        logger.debug("Scheduling task {} to run in {} seconds", task.getId(), delayInMs / 1000);
+        logger.debug("Scheduling task {} to run in {} seconds", task.getContext().getTaskId(), delayInMs / 1000);
         ScheduledFuture future = executor.schedule(task, delayInMs, TimeUnit.MILLISECONDS);
         futureMap.put(task, future);
     }

@@ -8,6 +8,7 @@
 package com.whizzosoftware.hobson.scheduler;
 
 import com.whizzosoftware.hobson.api.config.Configuration;
+import com.whizzosoftware.hobson.api.device.DeviceContext;
 import com.whizzosoftware.hobson.api.event.EventTopics;
 import com.whizzosoftware.hobson.api.event.HobsonEvent;
 import com.whizzosoftware.hobson.api.event.HubConfigurationUpdateEvent;
@@ -15,7 +16,6 @@ import com.whizzosoftware.hobson.api.hub.HubLocation;
 import com.whizzosoftware.hobson.api.plugin.AbstractHobsonPlugin;
 import com.whizzosoftware.hobson.api.plugin.PluginStatus;
 import com.whizzosoftware.hobson.api.plugin.PluginType;
-import com.whizzosoftware.hobson.api.util.UserUtil;
 import com.whizzosoftware.hobson.api.variable.HobsonVariable;
 import com.whizzosoftware.hobson.api.variable.VariableUpdate;
 import com.whizzosoftware.hobson.scheduler.executor.ThreadPoolScheduledTaskExecutor;
@@ -53,10 +53,9 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
         longitude = hl.getLongitude();
 
         // create an ical task provider
-        taskProvider = new ICalTaskProvider(getId(), latitude, longitude);
+        taskProvider = new ICalTaskProvider(getContext(), latitude, longitude);
         taskProvider.setScheduleExecutor(new ThreadPoolScheduledTaskExecutor());
         taskProvider.setScheduleFile(getDataFile("schedule.ics"));
-        publishTaskProvider(taskProvider);
         taskProvider.start();
 
         // set the initial sunrise and sunset
@@ -142,8 +141,8 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
             logger.debug("Sunrise: {}, sunset: {}", sunrise, sunset);
 
             List<VariableUpdate> updates = new ArrayList<>();
-            updates.add(new VariableUpdate(getId(), SUNRISE, sunrise));
-            updates.add(new VariableUpdate(getId(), SUNSET, sunset));
+            updates.add(new VariableUpdate(DeviceContext.createLocalGlobal(getContext().getPluginId()), SUNRISE, sunrise));
+            updates.add(new VariableUpdate(DeviceContext.createLocalGlobal(getContext().getPluginId()), SUNSET, sunset));
             fireVariableUpdateNotifications(updates);
         }
     }

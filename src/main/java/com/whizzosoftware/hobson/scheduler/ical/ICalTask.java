@@ -8,10 +8,12 @@
 package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.api.HobsonRuntimeException;
+import com.whizzosoftware.hobson.api.action.ActionContext;
 import com.whizzosoftware.hobson.api.action.ActionManager;
 import com.whizzosoftware.hobson.api.action.HobsonActionRef;
+import com.whizzosoftware.hobson.api.plugin.PluginContext;
 import com.whizzosoftware.hobson.api.task.HobsonTask;
-import com.whizzosoftware.hobson.api.util.UserUtil;
+import com.whizzosoftware.hobson.api.task.TaskContext;
 import com.whizzosoftware.hobson.scheduler.TaskExecutionListener;
 import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
@@ -41,7 +43,7 @@ public class ICalTask implements HobsonTask, Runnable {
     protected static final String PROP_SCHEDULED = "scheduled";
     protected static final String PROP_ERROR = "error";
 
-    private String providerId;
+    private TaskContext ctx;
     private ActionManager actionManager;
     private VEvent event;
     private final List<HobsonActionRef> actions = new ArrayList<>();
@@ -51,13 +53,14 @@ public class ICalTask implements HobsonTask, Runnable {
     private Double longitude;
     private SolarOffset solarOffset;
 
-    public ICalTask(ActionManager actionManager, String providerId, VEvent event, TaskExecutionListener listener) throws InvalidVEventException {
+    public ICalTask(ActionManager actionManager, PluginContext pluginContext, VEvent event, TaskExecutionListener listener) throws InvalidVEventException {
         this.actionManager = actionManager;
-        this.providerId = providerId;
         this.event = event;
         this.listener = listener;
 
         if (event != null) {
+            this.ctx = TaskContext.create(pluginContext, event.getUid().getValue());
+
             // adjust start time if sun offset is set
             Property sunOffset = event.getProperty(PROP_SUN_OFFSET);
             if (sunOffset != null) {
@@ -88,23 +91,44 @@ public class ICalTask implements HobsonTask, Runnable {
         }
     }
 
-    public ICalTask(ActionManager actionManager, String providerId, JSONObject json) {
+    public ICalTask(ActionManager actionManager, TaskContext ctx, JSONObject config) {
         this.actionManager = actionManager;
-        this.providerId = providerId;
+        this.ctx = ctx;
+        update(config.has("id") ? config.getString("id") : null, config);
+    }
 
-        this.event = new VEvent();
-        String id;
-        if (json.has("id")) {
-            id = json.getString("id");
+    @Override
+    public TaskContext getContext() {
+        return ctx;
+    }
+
+    @Override
+    public String getName() {
+        if (event.getSummary() != null) {
+            return event.getSummary().getValue();
         } else {
-            id = UUID.randomUUID().toString();
+            return null;
         }
+    }
+
+    @Override
+    public Type getType() {
+        return Type.SCHEDULE;
+    }
+
+    @Override
+    public Properties getProperties() {
+        return properties;
+    }
+
+    public void update(String id, JSONObject config) {
+        this.event = new VEvent();
         event.getProperties().add(new Uid(id));
-        event.getProperties().add(new Summary(json.getString("name")));
+        event.getProperties().add(new Summary(config.getString("name")));
 
         try {
-            if (json.has("conditions")) {
-                JSONArray conditions = json.getJSONArray("conditions");
+            if (config.has("conditions")) {
+                JSONArray conditions = config.getJSONArray("conditions");
                 if (conditions.length() == 1) {
                     JSONObject jc = conditions.getJSONObject(0);
                     if (jc.has("start") && !jc.isNull("start")) {
@@ -125,8 +149,8 @@ public class ICalTask implements HobsonTask, Runnable {
         }
 
         try {
-            if (json.has("actions")) {
-                JSONArray actions = json.getJSONArray("actions");
+            if (config.has("actions")) {
+                JSONArray actions = config.getJSONArray("actions");
                 event.getProperties().add(new Comment(actions.toString()));
                 for (int i=0; i < actions.length(); i++) {
                     addActionRef(actions.getJSONObject(i));
@@ -135,39 +159,6 @@ public class ICalTask implements HobsonTask, Runnable {
         } catch (Exception e) {
             throw new HobsonRuntimeException("Error parsing actions", e);
         }
-    }
-
-    @Override
-    public String getId() {
-        if (event != null && event.getUid() != null) {
-            return event.getUid().getValue();
-        } else {
-            return null;
-        }
-    }
-
-    @Override
-    public String getProviderId() {
-        return providerId;
-    }
-
-    @Override
-    public String getName() {
-        if (event.getSummary() != null) {
-            return event.getSummary().getValue();
-        } else {
-            return null;
-        }
-    }
-
-    @Override
-    public Type getType() {
-        return Type.SCHEDULE;
-    }
-
-    @Override
-    public Properties getProperties() {
-        return properties;
     }
 
     @Override
@@ -288,7 +279,7 @@ public class ICalTask implements HobsonTask, Runnable {
     private void executeActions() {
         if (actionManager != null) {
             for (HobsonActionRef ref : actions) {
-                actionManager.executeAction(UserUtil.DEFAULT_USER, UserUtil.DEFAULT_HUB, ref.getPluginId(), ref.getActionId(), ref.getProperties());
+                actionManager.executeAction(ActionContext.create(ctx.getPluginContext(), ref.getActionId()), ref.getProperties());
             }
         } else {
             logger.error("No action manager is available to execute actions");

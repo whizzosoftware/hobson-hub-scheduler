@@ -9,6 +9,8 @@ package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.api.action.HobsonActionRef;
 import com.whizzosoftware.hobson.api.action.MockActionManager;
+import com.whizzosoftware.hobson.api.plugin.PluginContext;
+import com.whizzosoftware.hobson.api.task.TaskContext;
 import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.data.CalendarBuilder;
@@ -39,10 +41,11 @@ import static org.junit.Assert.*;
 public class ICalTaskTest {
     @Test
     public void testConstructorWithNoActions() throws Exception {
+        PluginContext ctx = PluginContext.createLocal("pluginId");
         VEvent event = new VEvent(new DateTime(), "task1");
         event.getProperties().add(new Uid("uid"));
         try {
-            new ICalTask(null, "", event, null);
+            new ICalTask(null, ctx, event, null);
             fail("Should have thrown exception");
         } catch (InvalidVEventException ignored) {
         }
@@ -50,11 +53,12 @@ public class ICalTaskTest {
 
     @Test
     public void testConstructorWithActions() throws Exception {
+        PluginContext ctx = PluginContext.createLocal("pluginId");
         VEvent event = new VEvent(new DateTime(), "task2");
         event.getProperties().add(new Uid("uid2"));
         event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
-        ICalTask task = new ICalTask(null, "", event, null);
-        assertEquals("uid2", task.getId());
+        ICalTask task = new ICalTask(null, ctx, event, null);
+        assertEquals("uid2", task.getContext().getTaskId());
         assertEquals("task2", task.getName());
         assertNotNull(task.getActions());
         assertEquals(1, task.getActions().size());
@@ -66,6 +70,7 @@ public class ICalTaskTest {
 
     @Test
     public void testGetConditions() throws Exception {
+        PluginContext ctx = PluginContext.createLocal("pluginId");
         TimeZone tz = TimeZone.getTimeZone("GMT");
         VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
@@ -73,7 +78,7 @@ public class ICalTaskTest {
         Recur recur = new Recur("FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13");
         event.getProperties().add(new RRule(recur));
 
-        ICalTask task = new ICalTask(null, "", event, null);
+        ICalTask task = new ICalTask(null, ctx, event, null);
 
         Collection<Map<String,Object>> conditions = task.getConditions();
         assertEquals(1, conditions.size());
@@ -85,6 +90,7 @@ public class ICalTaskTest {
 
     @Test
     public void testGetConditionsWithSunOffset() throws Exception {
+        PluginContext ctx = PluginContext.createLocal("pluginId");
         TimeZone tz = TimeZone.getTimeZone("GMT");
         VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
@@ -93,7 +99,7 @@ public class ICalTaskTest {
         event.getProperties().add(new RRule(recur));
         event.getProperties().add(new XProperty(ICalTask.PROP_SUN_OFFSET, "SS"));
 
-        ICalTask task = new ICalTask(null, "", event, null);
+        ICalTask task = new ICalTask(null, ctx, event, null);
 
         Collection<Map<String,Object>> conditions = task.getConditions();
         assertEquals(1, conditions.size());
@@ -106,6 +112,7 @@ public class ICalTaskTest {
 
     @Test
     public void testNextFridayThe13th() throws Exception {
+        PluginContext ctx = PluginContext.createLocal("pluginId");
         TimeZone tz = TimeZone.getTimeZone("GMT");
 
         // event starts on 4/13/2001 and goes monthly every friday the 13th
@@ -116,7 +123,7 @@ public class ICalTaskTest {
         event.getProperties().add(new RRule(recur));
 
         // check from day before first occurrence
-        ICalTask task = new ICalTask(null, "", event, null);
+        ICalTask task = new ICalTask(null, ctx, event, null);
         List<Long> periods = task.getRunsDuringInterval(DateHelper.getTime(tz, 2001, 4, 12, 0, 0, 0), DateHelper.getTime(tz, 2001, 4, 14, 0, 0, 0));
         assertEquals(1, periods.size());
 
@@ -133,6 +140,7 @@ public class ICalTaskTest {
 
     @Test
     public void testEvery3DaysAt9AM() throws Exception {
+        PluginContext ctx = PluginContext.createLocal("pluginId");
         TimeZone tz = TimeZone.getTimeZone("GMT");
 
         // create event
@@ -143,7 +151,7 @@ public class ICalTaskTest {
         event.getProperties().add(new RRule(recur));
 
         // check from day before first occurrence
-        ICalTask task = new ICalTask(null, "", event, null);
+        ICalTask task = new ICalTask(null, ctx, event, null);
         List<Long> periods = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 6, 1, 9, 0, 0), DateHelper.getTime(tz, 2014, 8, 31, 23, 59, 59));
         assertEquals(31, periods.size());
         assertEquals(DateHelper.getTime(tz, 2014, 6, 1, 9, 0, 0), (long)periods.get(0));
@@ -182,7 +190,7 @@ public class ICalTaskTest {
 
     @Test
     public void testJSONRuleConstruction() throws Exception {
-        ICalTaskProvider provider = new ICalTaskProvider("pluginId", null, null);
+        ICalTaskProvider provider = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
         provider.setScheduleExecutor(new MockScheduledTaskExecutor());
 
         // validate we start with a non-existent temp file
@@ -194,7 +202,7 @@ public class ICalTaskTest {
             provider.setScheduleFile(calendarFile);
             provider.reloadScheduleFile();
             JSONObject json = new JSONObject(new JSONTokener("{'name':'My Task','conditions':[{'start':'20140701T100000','recurrence':'FREQ=MINUTELY;INTERVAL=1'}],'actions':[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'logentry'}}]}"));
-            provider.addTask(json);
+            provider.onCreateTask(json);
 
             // make sure the provider updated the rule file
             assertTrue(calendarFile.exists());
@@ -227,7 +235,7 @@ public class ICalTaskTest {
 
     @Test
     public void testJSONRuleConstructionWithSunOffset() throws Exception {
-        ICalTaskProvider provider = new ICalTaskProvider("pluginId", null, null);
+        ICalTaskProvider provider = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
         provider.setScheduleExecutor(new MockScheduledTaskExecutor());
 
         // validate we start with a non-existent temp file
@@ -239,7 +247,7 @@ public class ICalTaskTest {
             provider.setScheduleFile(calendarFile);
             provider.reloadScheduleFile();
             JSONObject json = new JSONObject(new JSONTokener("{'name':'My Task','conditions':[{'start':'20140701T100000','recurrence':'FREQ=MINUTELY;INTERVAL=1','sunOffset':'SR'}],'actions':[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'logentry'}}]}"));
-            provider.addTask(json);
+            provider.onCreateTask(json);
 
             // make sure the provider updated the rule file
             assertTrue(calendarFile.exists());
@@ -273,6 +281,7 @@ public class ICalTaskTest {
 
     @Test
     public void testSunOffset() throws Exception {
+        PluginContext ctx = PluginContext.createLocal("pluginId");
         MockActionManager am = new MockActionManager();
         TimeZone tz = TimeZone.getTimeZone("America/Denver");
         VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0)), "task1");
@@ -282,7 +291,7 @@ public class ICalTaskTest {
         Recur recur = new Recur("FREQ=DAILY;INTERVAL=1");
         event.getProperties().add(new RRule(recur));
 
-        ICalTask task = new ICalTask(am, "providerId", event, null);
+        ICalTask task = new ICalTask(am, ctx, event, null);
         task.setLatitude(39.3722);
         task.setLongitude(-104.8561);
 
@@ -307,6 +316,7 @@ public class ICalTaskTest {
 
     @Test
     public void testGetRunsForIntervalWithNoLatLong() throws Exception {
+        PluginContext ctx = PluginContext.createLocal("pluginId");
         MockActionManager am = new MockActionManager();
         TimeZone tz = TimeZone.getTimeZone("America/Denver");
         VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0)), "task1");
@@ -316,7 +326,7 @@ public class ICalTaskTest {
         Recur recur = new Recur("FREQ=DAILY;INTERVAL=1");
         event.getProperties().add(new RRule(recur));
 
-        ICalTask task = new ICalTask(am, "providerId", event, null);
+        ICalTask task = new ICalTask(am, ctx, event, null);
 
         List<Long> runs = null;
         try {

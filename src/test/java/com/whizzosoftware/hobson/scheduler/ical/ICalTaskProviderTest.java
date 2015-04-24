@@ -8,6 +8,9 @@
 package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.api.action.MockActionManager;
+import com.whizzosoftware.hobson.api.plugin.PluginContext;
+import com.whizzosoftware.hobson.api.task.MockTaskManager;
+import com.whizzosoftware.hobson.api.task.TaskContext;
 import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.data.CalendarBuilder;
@@ -26,7 +29,7 @@ import java.util.TimeZone;
 public class ICalTaskProviderTest {
     @Test
     public void testloadCalendarWithNoExecutor() {
-        ICalTaskProvider scheduler = new ICalTaskProvider("pluginId", null, null);
+        ICalTaskProvider scheduler = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
         String s = "";
         try {
             scheduler.loadICSStream(new ByteArrayInputStream(s.getBytes()), System.currentTimeMillis());
@@ -40,7 +43,7 @@ public class ICalTaskProviderTest {
         File sfile = File.createTempFile("hobsonschedule", ".ics");
         sfile.delete();
         try {
-            ICalTaskProvider scheduler = new ICalTaskProvider("pluginId", null, null);
+            ICalTaskProvider scheduler = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
             scheduler.setScheduleExecutor(new MockScheduledTaskExecutor());
             scheduler.setScheduleFile(sfile);
         } finally {
@@ -69,7 +72,9 @@ public class ICalTaskProviderTest {
 
         long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
 
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
+        MockTaskManager mgr = new MockTaskManager();
+        ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
+        s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
@@ -99,14 +104,16 @@ public class ICalTaskProviderTest {
         // assert what happens the day OF the event
         long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
 
+        MockTaskManager manager = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
+        ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
+        s.setTaskManager(manager);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
         // verify task was created
-        assertEquals(1, s.getTasks().size());
-        ICalTask t = (ICalTask)s.getTasks().iterator().next();
+        assertEquals(1, manager.getPublishedTasks().size());
+        ICalTask t = (ICalTask)manager.getPublishedTasks().iterator().next();
         assertEquals("My Task", t.getName());
 
         // verify task was scheduled -- should have been scheduled to execute in 61200 seconds (17 hours)
@@ -118,10 +125,10 @@ public class ICalTaskProviderTest {
         s.resetForNewDay(startOfDay);
 
         // verify the task was created but not scheduled
-        assertEquals(1, s.getTasks().size());
+        assertEquals(1, manager.getPublishedTasks().size());
 
         // verify task was not scheduled
-        assertFalse(executor.isTaskScheduled((ICalTask) s.getTasks().iterator().next()));
+        assertFalse(executor.isTaskScheduled((ICalTask)manager.getPublishedTasks().iterator().next()));
         assertFalse(executor.hasDelays());
         assertNull(executor.getDelayForTask(t));
     }
@@ -159,13 +166,15 @@ public class ICalTaskProviderTest {
             fw.append(ical);
             fw.close();
 
-            ICalTaskProvider p = new ICalTaskProvider("pluginId", null, null, TimeZone.getTimeZone("America/Denver"));
+            MockTaskManager mgr = new MockTaskManager();
+            ICalTaskProvider p = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, TimeZone.getTimeZone("America/Denver"));
+            p.setTaskManager(mgr);
             p.setScheduleExecutor(new MockScheduledTaskExecutor());
             p.setScheduleFile(file);
             p.start();
 
             // make sure the task was created
-            assertEquals(1, p.getTasks().size());
+            assertEquals(1, mgr.getPublishedTasks().size());
 
             // create task JSON
             JSONObject json = new JSONObject();
@@ -187,7 +196,7 @@ public class ICalTaskProviderTest {
             props.put("message", "foobar");
 
             // update the task
-            p.updateTask("15dee4fe-a841-4cf6-8d7f-76c3ad5492b1", json);
+            p.onUpdateTask(mgr.getTask(TaskContext.createLocal("pluginId", "15dee4fe-a841-4cf6-8d7f-76c3ad5492b1")), json);
 
             assertTrue(file.exists());
 
@@ -228,15 +237,17 @@ public class ICalTaskProviderTest {
 
         long startOfDay = DateHelper.getTime(tz, 2014, 10, 18, 0, 0, 0);
 
+        MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
+        ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
+        s.setTaskManager(mgr);
         s.setLatitudeLongitude(39.3722, -104.8561);
         s.setScheduleExecutor(executor);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), startOfDay);
 
         // verify task was created
-        assertEquals(1, s.getTasks().size());
-        ICalTask t = (ICalTask)s.getTasks().iterator().next();
+        assertEquals(1, mgr.getPublishedTasks().size());
+        ICalTask t = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertEquals("My Task", t.getName());
 
         // verify task was scheduled -- should have been scheduled to execute in 61200 seconds (17 hours)
@@ -261,22 +272,24 @@ public class ICalTaskProviderTest {
 
         long schedulerStart = DateHelper.getTime(tz, 2014, 7, 1, 8, 0, 0);
 
+        MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionContext = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
+        ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
+        s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionContext);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), schedulerStart);
 
         // verify task was created but not run
-        assertEquals(1, s.getTasks().size());
+        assertEquals(1, mgr.getPublishedTasks().size());
         assertEquals(0, actionContext.getLogCalls());
 
         // reload the file at midnight
         s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 0));
 
         // verify task was created but not executed
-        assertEquals(1, s.getTasks().size());
+        assertEquals(1, mgr.getPublishedTasks().size());
         assertEquals(0, actionContext.getLogCalls());
     }
 
@@ -297,16 +310,18 @@ public class ICalTaskProviderTest {
                 "END:VCALENDAR";
 
         // start the scheduler after the task should have run
+        MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
+        ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
+        s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 17, 0, 0));
 
         // verify task was not scheduled
-        assertEquals(1, s.getTasks().size());
-        assertFalse(executor.isTaskScheduled((ICalTask) s.getTasks().iterator().next()));
+        assertEquals(1, mgr.getPublishedTasks().size());
+        assertFalse(executor.isTaskScheduled((ICalTask)mgr.getPublishedTasks().iterator().next()));
         assertEquals(0, actionManager.getLogCalls());
 
         // start a new day 30 seconds after midnight -- this covers the corner case where a delay causes the
@@ -315,8 +330,8 @@ public class ICalTaskProviderTest {
         s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 30));
 
         // verify task was not scheduled but task executed
-        assertEquals(1, s.getTasks().size());
-        ICalTask task = (ICalTask)s.getTasks().iterator().next();
+        assertEquals(1, mgr.getPublishedTasks().size());
+        ICalTask task = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertFalse(executor.isTaskScheduled(task));
         assertEquals(1404367200000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
         assertFalse((boolean)task.getProperties().get(ICalTask.PROP_SCHEDULED));
@@ -341,17 +356,19 @@ public class ICalTaskProviderTest {
                 "END:VCALENDAR";
 
         // start the scheduler after the task should have run
+        MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
+        ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
+        s.setTaskManager(mgr);
         s.setLatitudeLongitude(39.3722, -104.8561);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
 
         // verify task was not scheduled or executed
-        assertEquals(1, s.getTasks().size());
-        ICalTask t = (ICalTask)s.getTasks().iterator().next();
+        assertEquals(1, mgr.getPublishedTasks().size());
+        ICalTask t = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertFalse(executor.isTaskScheduled(t));
         assertEquals(0, actionManager.getLogCalls());
         assertNull(t.getProperties().getProperty(ICalTask.PROP_NEXT_RUN_TIME));
@@ -360,8 +377,8 @@ public class ICalTaskProviderTest {
         s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 0));
 
         // verify task was scheduled at appropriate time and task did not execute
-        assertEquals(1, s.getTasks().size());
-        t = (ICalTask)s.getTasks().iterator().next();
+        assertEquals(1, mgr.getPublishedTasks().size());
+        t = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertTrue(executor.isTaskScheduled(t));
         assertEquals(75600000, (long) executor.getDelayForTask(t));
         assertEquals(0, actionManager.getLogCalls());
@@ -386,16 +403,18 @@ public class ICalTaskProviderTest {
                 "END:VCALENDAR";
 
         // start the scheduler when the task should have run
+        MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
+        ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
+        s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 23, 0, 0));
 
         // verify task was created and its next run time
-        assertEquals(1, s.getTasks().size());
-        ICalTask task = (ICalTask)s.getTasks().iterator().next();
+        assertEquals(1, mgr.getPublishedTasks().size());
+        ICalTask task = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertEquals(1406952000000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
     }
 
@@ -416,16 +435,18 @@ public class ICalTaskProviderTest {
                 "END:VCALENDAR";
 
         // start the scheduler when the task should have run
+        MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
+        ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
+        s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 8, 1, 21, 0, 0));
 
         // verify task was created and its next run time
-        assertEquals(1, s.getTasks().size());
-        ICalTask task = (ICalTask)s.getTasks().iterator().next();
+        assertEquals(1, mgr.getPublishedTasks().size());
+        ICalTask task = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertEquals(1435809600000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
     }
 
@@ -453,9 +474,11 @@ public class ICalTaskProviderTest {
                 "END:VEVENT\n" +
                 "END:VCALENDAR\n";
 
+        MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionContext = new MockActionManager();
-        ICalTaskProvider scheduler = new ICalTaskProvider("pluginId", null, null, tz);
+        ICalTaskProvider scheduler = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
+        scheduler.setTaskManager(mgr);
         scheduler.setScheduleExecutor(executor);
         scheduler.setActionManager(actionContext);
 
@@ -463,8 +486,8 @@ public class ICalTaskProviderTest {
         scheduler.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 11, 0, 1));
 
         // verify task was created and scheduled
-        assertEquals(1, scheduler.getTasks().size());
-        ICalTask task = (ICalTask)scheduler.getTasks().iterator().next();
+        assertEquals(1, mgr.getPublishedTasks().size());
+        ICalTask task = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertEquals(0, actionContext.getLogCalls());
         assertTrue(executor.hasDelays());
         assertEquals(59000, (long)executor.getDelayForTask(task));
@@ -496,15 +519,17 @@ public class ICalTaskProviderTest {
                 "END:VCALENDAR";
 
         // start the scheduler after the task should have run
+        MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
         MockActionManager actionManager = new MockActionManager();
-        ICalTaskProvider s = new ICalTaskProvider("pluginId", null, null, tz);
+        ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
+        s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
         s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
 
-        assertEquals(1, s.getTasks().size());
-        ICalTask t = (ICalTask)s.getTasks().iterator().next();
+        assertEquals(1, mgr.getPublishedTasks().size());
+        ICalTask t = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertTrue(t.getProperties().containsKey(ICalTask.PROP_ERROR));
     }
 }

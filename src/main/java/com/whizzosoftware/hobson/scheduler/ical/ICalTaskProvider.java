@@ -10,7 +10,10 @@ package com.whizzosoftware.hobson.scheduler.ical;
 import com.whizzosoftware.hobson.api.HobsonNotFoundException;
 import com.whizzosoftware.hobson.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.api.action.ActionManager;
+import com.whizzosoftware.hobson.api.plugin.PluginContext;
 import com.whizzosoftware.hobson.api.task.HobsonTask;
+import com.whizzosoftware.hobson.api.task.TaskContext;
+import com.whizzosoftware.hobson.api.task.TaskManager;
 import com.whizzosoftware.hobson.api.task.TaskProvider;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherListener;
 import com.whizzosoftware.hobson.api.util.filewatch.FileWatcherThread;
@@ -47,16 +50,14 @@ import java.util.concurrent.TimeUnit;
 public class ICalTaskProvider implements TaskProvider, FileWatcherListener, TaskExecutionListener {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    public static final String PROVIDER = "com.whizzosoftware.hobson.hub.hobson-hub-scheduler";
-
     private static final long MS_24_HOURS = 86400000;
 
+    private PluginContext ctx;
+    private TaskManager taskManager;
     private DayResetListener dayResetListener;
-    private String pluginId;
     private ActionManager actionManager;
     private Calendar calendar;
     private ScheduledTaskExecutor executor;
-    private final Map<String,ICalTask> taskMap = new HashMap<>();
     private File scheduleFile;
     private FileWatcherThread watcherThread;
     private ScheduledThreadPoolExecutor resetDayExecutor;
@@ -65,29 +66,27 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
     private TimeZone timeZone;
     private boolean running = false;
 
-    public ICalTaskProvider(String pluginId, Double latitude, Double longitude) {
-        this(pluginId, latitude, longitude, TimeZone.getDefault());
+    public ICalTaskProvider(PluginContext ctx, Double latitude, Double longitude) {
+        this(ctx, latitude, longitude, TimeZone.getDefault());
     }
 
-    public ICalTaskProvider(String pluginId, Double latitude, Double longitude, TimeZone timeZone) {
-        this.pluginId = pluginId;
+    public ICalTaskProvider(PluginContext ctx, Double latitude, Double longitude, TimeZone timeZone) {
+        this.ctx = ctx;
         this.latitude = latitude;
         this.longitude = longitude;
         this.timeZone = timeZone;
+    }
+
+    public void setTaskManager(TaskManager taskManager) {
+        this.taskManager = taskManager;
     }
 
     public void setDayResetListener(DayResetListener dayResetListener) {
         this.dayResetListener = dayResetListener;
     }
 
-    @Override
-    public String getPluginId() {
-        return pluginId;
-    }
-
-    @Override
-    public String getId() {
-        return PROVIDER;
+    public PluginContext getPluginContext() {
+        return ctx;
     }
 
     public Double getLatitude() {
@@ -104,30 +103,6 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
         reloadScheduleFile();
     }
 
-    @Override
-    synchronized public Collection<HobsonTask> getTasks() {
-        return new ArrayList<HobsonTask>(taskMap.values());
-    }
-
-    @Override
-    synchronized public HobsonTask getTask(String taskId) {
-        return taskMap.get(taskId);
-    }
-
-    @Override
-    synchronized public void addTask(Object task) {
-        try {
-            JSONObject json = (JSONObject)task;
-            ICalTask ict = new ICalTask(actionManager, PROVIDER, json);
-            ict.setLatitude(latitude);
-            ict.setLongitude(longitude);
-            calendar.getComponents().add(ict.getVEvent());
-            writeFile();
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     /**
      * Adds a new task.
      *
@@ -140,8 +115,10 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
      * @throws Exception on failure
      */
     protected boolean addTask(ICalTask task, long now, boolean wasDayReset) throws Exception {
-        logger.debug("Adding task {} with ID: {}", task.getName(), task.getId());
-        taskMap.put(task.getId(), task);
+        logger.debug("Adding task {} with ID: {}", task.getName(), task.getContext().getTaskId());
+        if (taskManager != null) {
+            taskManager.publishTask(task);
+        }
         return scheduleNextRun(task, now, wasDayReset);
     }
 
@@ -198,45 +175,6 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
         }
 
         return shouldRunToday;
-    }
-
-    @Override
-    synchronized public void updateTask(String taskId, Object task) {
-        try {
-            // create new ical task
-            JSONObject json = (JSONObject)task;
-            json.put("id", taskId);
-            ICalTask newTask = new ICalTask(actionManager, PROVIDER, json);
-            newTask.setLatitude(latitude);
-            newTask.setLongitude(longitude);
-
-            ICalTask oldTask = taskMap.get(taskId);
-            if (oldTask != null) {
-                // remove old task
-                calendar.getComponents().remove(oldTask.getVEvent());
-                // add new task
-                calendar.getComponents().add(newTask.getVEvent());
-                taskMap.put(taskId, newTask);
-                writeFile();
-            } else {
-                throw new HobsonNotFoundException("The specified task was not found");
-            }
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    @Override
-    synchronized public void deleteTask(String taskId) {
-        ICalTask task = taskMap.get(taskId);
-        if (task != null) {
-            // remove the task from the calendar and write out a new calendar file
-            calendar.getComponents().remove(task.getVEvent());
-            taskMap.remove(taskId);
-            writeFile();
-        } else {
-            logger.error("Unable to find task for removal: {}", taskId);
-        }
     }
 
     public void setScheduleFile(File scheduleFile) {
@@ -313,8 +251,6 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
 
         executor.stop();
         executor = null;
-
-        taskMap.clear();
     }
 
     public void resetForNewDay(long now) {
@@ -372,7 +308,9 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
     synchronized protected void clearAllTasks() {
         logger.debug("Clearing all tasks");
         executor.cancelAll();
-        taskMap.clear();
+        if (taskManager != null) {
+            taskManager.unpublishAllTasks(ctx);
+        }
     }
 
     synchronized protected void loadICSStream(InputStream is, long now) throws Exception {
@@ -388,13 +326,11 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
         // clear all existing scheduled tasks
         clearAllTasks();
 
-        // determine first & last milliseconds of today
-
         // iterate through all events and schedule them if they are supposed to run today
         ComponentList eventList = calendar.getComponents(Component.VEVENT);
         for (Object anEventList : eventList) {
             VEvent event = (VEvent)anEventList;
-            ICalTask task = new ICalTask(actionManager, PROVIDER, event, this);
+            ICalTask task = new ICalTask(actionManager, ctx, event, this);
             task.setLatitude(latitude);
             task.setLongitude(longitude);
             if (addTask(task, now, wasDayReset)) {
@@ -431,6 +367,52 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
             outputter.output(calendar, new FileOutputStream(scheduleFile));
         } catch (Exception e) {
             logger.error("Error writing schedule file", e);
+        }
+    }
+
+    @Override
+    public void onCreateTask(Object config) {
+        try {
+            JSONObject json = (JSONObject)config;
+            ICalTask ict = new ICalTask(actionManager, TaskContext.create(getPluginContext(), UUID.randomUUID().toString()), json);
+            ict.setLatitude(latitude);
+            ict.setLongitude(longitude);
+            calendar.getComponents().add(ict.getVEvent());
+            writeFile();
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void onUpdateTask(HobsonTask task, Object config) {
+        try {
+            if (task instanceof ICalTask) {
+                ICalTask icTask = (ICalTask)task;
+                // remove scheduled event from calendar
+                calendar.getComponents().remove(icTask.getVEvent());
+                // update task
+                icTask.update(task.getContext().getTaskId(), (JSONObject)config);
+                // add new scheduled event to calendar
+                calendar.getComponents().add(icTask.getVEvent());
+                writeFile();
+            } else {
+                throw new HobsonNotFoundException("The specified task was not found or invalid");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @Override
+    public void onDeleteTask(HobsonTask task) {
+        if (task != null && task instanceof ICalTask) {
+            ICalTask icTask = (ICalTask)task;
+            // remove the task from the calendar and write out a new calendar file
+            calendar.getComponents().remove(icTask.getVEvent());
+            writeFile();
+        } else {
+            logger.error("Unable to find task for removal: {}", task.getContext());
         }
     }
 }
