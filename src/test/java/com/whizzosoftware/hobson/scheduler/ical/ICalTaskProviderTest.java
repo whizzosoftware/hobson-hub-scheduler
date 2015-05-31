@@ -7,10 +7,13 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.ical;
 
-import com.whizzosoftware.hobson.api.action.MockActionManager;
 import com.whizzosoftware.hobson.api.plugin.PluginContext;
+import com.whizzosoftware.hobson.api.property.PropertyContainer;
+import com.whizzosoftware.hobson.api.property.PropertyContainerClassContext;
+import com.whizzosoftware.hobson.api.property.PropertyContainerSet;
 import com.whizzosoftware.hobson.api.task.MockTaskManager;
 import com.whizzosoftware.hobson.api.task.TaskContext;
+import com.whizzosoftware.hobson.scheduler.SchedulerPlugin;
 import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.data.CalendarBuilder;
@@ -18,17 +21,16 @@ import net.fortuna.ical4j.model.Calendar;
 import net.fortuna.ical4j.model.component.VEvent;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import org.json.JSONTokener;
 import org.junit.Test;
 import static org.junit.Assert.*;
 import static org.junit.Assert.assertEquals;
 
 import java.io.*;
-import java.util.TimeZone;
+import java.util.*;
 
 public class ICalTaskProviderTest {
     @Test
-    public void testloadCalendarWithNoExecutor() {
+    public void testLoadCalendarWithNoExecutor() {
         ICalTaskProvider scheduler = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
         String s = "";
         try {
@@ -66,6 +68,7 @@ public class ICalTaskProviderTest {
                 "DTSTART:20130714T170000Z\n" +
                 "DTEND:20130714T170000Z\n" +
                 "SUMMARY:My Task\n" +
+                "X-ACTION-SET:foo\n" +
                 "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
@@ -97,7 +100,7 @@ public class ICalTaskProviderTest {
                 "DTSTART:20130714T170000Z\n" +
                 "DTEND:20130714T170000Z\n" +
                 "SUMMARY:My Task\n" +
-                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]\n" +
+                "X-ACTION-SET:foo\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
@@ -128,7 +131,7 @@ public class ICalTaskProviderTest {
         assertEquals(1, manager.getPublishedTasks().size());
 
         // verify task was not scheduled
-        assertFalse(executor.isTaskScheduled((ICalTask)manager.getPublishedTasks().iterator().next()));
+        assertFalse(executor.isTaskScheduled((ICalTask) manager.getPublishedTasks().iterator().next()));
         assertFalse(executor.hasDelays());
         assertNull(executor.getDelayForTask(t));
     }
@@ -145,7 +148,7 @@ public class ICalTaskProviderTest {
                     "DTSTART:20130714T170000Z\n" +
                     "DTEND:20130714T170000Z\n" +
                     "SUMMARY:My Task\n" +
-                    "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]\n" +
+                    "X-ACTION-SET:foo\n" +
                     "END:VEVENT\n" +
                     "END:VCALENDAR";
 
@@ -157,7 +160,6 @@ public class ICalTaskProviderTest {
                     "DTSTART:20130714T170000Z\n" +
                     "DTEND:20130714T170000Z\n" +
                     "SUMMARY:My Edited Task\n" +
-                    "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Edited Action','properties':{'message':'foobar'}}]\n" +
                     "END:VEVENT\n" +
                     "END:VCALENDAR";
 
@@ -196,8 +198,24 @@ public class ICalTaskProviderTest {
             props.put("message", "foobar");
 
             // update the task
-            p.onUpdateTask(mgr.getTask(TaskContext.createLocal("pluginId", "15dee4fe-a841-4cf6-8d7f-76c3ad5492b1")), json);
-
+            TaskContext ctx = TaskContext.createLocal("pluginId", "15dee4fe-a841-4cf6-8d7f-76c3ad5492b1");
+            Map<String,Object> propValues = new HashMap<>();
+            propValues.put("date", "20130714");
+            propValues.put("time", "170000Z");
+            p.onUpdateTask(
+                ctx,
+                "My Edited Task",
+                new PropertyContainerSet(
+                    new PropertyContainer(
+                        PropertyContainerClassContext.create(PluginContext.createLocal("pluginId"), "foo"),
+                        propValues
+                    )
+                ),
+                new PropertyContainerSet(
+                    "log",
+                    null
+                )
+            );
             assertTrue(file.exists());
 
             // read back file
@@ -207,15 +225,6 @@ public class ICalTaskProviderTest {
             assertEquals("My Edited Task", c.getProperty("SUMMARY").getValue());
             assertEquals("15dee4fe-a841-4cf6-8d7f-76c3ad5492b1", c.getProperty("UID").getValue());
             assertEquals("20130714T170000Z", c.getProperty("DTSTART").getValue());
-            JSONArray aj = new JSONArray(new JSONTokener(c.getProperty("COMMENT").getValue()));
-            assertEquals(1, aj.length());
-            JSONObject cj = aj.getJSONObject(0);
-            assertEquals("com.whizzosoftware.hobson.server-api", cj.getString("pluginId"));
-            assertEquals("My Edited Action", cj.getString("name"));
-            assertEquals("log", cj.getString("actionId"));
-            assertTrue(cj.has("properties"));
-            JSONObject pj = cj.getJSONObject("properties");
-            assertEquals("foobar", pj.getString("message"));
         } finally {
             file.delete();
         }
@@ -231,7 +240,7 @@ public class ICalTaskProviderTest {
                 "DTSTART:20141018T000000\n" +
                 "SUMMARY:My Task\n" +
                 "X-SUN-OFFSET: SS30\n" +
-                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]\n" +
+                "X-ACTION-SET:foo\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
@@ -266,7 +275,7 @@ public class ICalTaskProviderTest {
                 "DTSTART:20140701T090000Z\n" +
                 "RRULE:FREQ=DAILY\n" +
                 "SUMMARY:My Task\n" +
-                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
+                "X-ACTION-SET:foo\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
@@ -274,23 +283,19 @@ public class ICalTaskProviderTest {
 
         MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
-        MockActionManager actionContext = new MockActionManager();
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.setActionManager(actionContext);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), schedulerStart);
 
         // verify task was created but not run
         assertEquals(1, mgr.getPublishedTasks().size());
-        assertEquals(0, actionContext.getLogCalls());
 
         // reload the file at midnight
         s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 0));
 
         // verify task was created but not executed
         assertEquals(1, mgr.getPublishedTasks().size());
-        assertEquals(0, actionContext.getLogCalls());
     }
 
     @Test
@@ -305,24 +310,21 @@ public class ICalTaskProviderTest {
                 "DTSTART:20140701T000000\n" +
                 "RRULE:FREQ=DAILY\n" +
                 "SUMMARY:My Task\n" +
-                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
+                "X-ACTION-SET:foo\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
         // start the scheduler after the task should have run
         MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
-        MockActionManager actionManager = new MockActionManager();
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 17, 0, 0));
 
         // verify task was not scheduled
         assertEquals(1, mgr.getPublishedTasks().size());
         assertFalse(executor.isTaskScheduled((ICalTask)mgr.getPublishedTasks().iterator().next()));
-        assertEquals(0, actionManager.getLogCalls());
 
         // start a new day 30 seconds after midnight -- this covers the corner case where a delay causes the
         // resetForNewDay() method to get fired slightly after midnight and there are tasks that should have
@@ -334,15 +336,14 @@ public class ICalTaskProviderTest {
         ICalTask task = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertFalse(executor.isTaskScheduled(task));
         assertEquals(1404367200000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
-        assertFalse((boolean)task.getProperties().get(ICalTask.PROP_SCHEDULED));
-        assertEquals(1, actionManager.getLogCalls());
+        assertFalse((boolean) task.getProperties().get(ICalTask.PROP_SCHEDULED));
     }
 
     @Test
     public void testDayResetWithSolarOffsetTask() throws Exception {
         TimeZone tz = TimeZone.getDefault();
 
-        // an event that runs every day at midnight
+        // an event that runs every day 30 minutes after sunset
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
@@ -350,28 +351,26 @@ public class ICalTaskProviderTest {
                 "DTSTART:20140701T000000\n" +
                 "RRULE:FREQ=DAILY\n" +
                 "X-SUN-OFFSET:SS30\n" +
+                "X-ACTION-SET:foo\n" +
                 "SUMMARY:My Task\n" +
-                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
+                "X-ACTION-SET:foo\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
         // start the scheduler after the task should have run
         MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
-        MockActionManager actionManager = new MockActionManager();
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setLatitudeLongitude(39.3722, -104.8561);
         s.setScheduleExecutor(executor);
-        s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
 
         // verify task was not scheduled or executed
         assertEquals(1, mgr.getPublishedTasks().size());
         ICalTask t = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertFalse(executor.isTaskScheduled(t));
-        assertEquals(0, actionManager.getLogCalls());
-        assertNull(t.getProperties().getProperty(ICalTask.PROP_NEXT_RUN_TIME));
+        assertNotNull(t.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
 
         // start a new day at midnight
         s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 0));
@@ -381,9 +380,8 @@ public class ICalTaskProviderTest {
         t = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertTrue(executor.isTaskScheduled(t));
         assertEquals(75600000, (long) executor.getDelayForTask(t));
-        assertEquals(0, actionManager.getLogCalls());
         assertEquals(1404356400000l, t.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
-        assertTrue((boolean)t.getProperties().get(ICalTask.PROP_SCHEDULED));
+        assertTrue((boolean) t.getProperties().get(ICalTask.PROP_SCHEDULED));
     }
 
     @Test
@@ -398,18 +396,16 @@ public class ICalTaskProviderTest {
                 "DTSTART:20140701T220000\n" +
                 "RRULE:FREQ=MONTHLY\n" +
                 "SUMMARY:My Task\n" +
-                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
+                "X-ACTION-SET:foo\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
         // start the scheduler when the task should have run
         MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
-        MockActionManager actionManager = new MockActionManager();
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 23, 0, 0));
 
         // verify task was created and its next run time
@@ -430,18 +426,16 @@ public class ICalTaskProviderTest {
                 "DTSTART:20140701T220000\n" +
                 "RRULE:FREQ=YEARLY\n" +
                 "SUMMARY:My Task\n" +
-                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
+                "X-ACTION-SET:foo\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
         // start the scheduler when the task should have run
         MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
-        MockActionManager actionManager = new MockActionManager();
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 8, 1, 21, 0, 0));
 
         // verify task was created and its next run time
@@ -470,17 +464,15 @@ public class ICalTaskProviderTest {
                 "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
                 "RRULE:FREQ=MINUTELY;INTERVAL=1\n" +
                 "SUMMARY:My Task\n" +
-                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Testing!'}}]\n" +
+                "X-ACTION-SET:foo\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR\n";
 
         MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
-        MockActionManager actionContext = new MockActionManager();
         ICalTaskProvider scheduler = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         scheduler.setTaskManager(mgr);
         scheduler.setScheduleExecutor(executor);
-        scheduler.setActionManager(actionContext);
 
         assertFalse(executor.hasDelays());
         scheduler.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 11, 0, 1));
@@ -488,9 +480,8 @@ public class ICalTaskProviderTest {
         // verify task was created and scheduled
         assertEquals(1, mgr.getPublishedTasks().size());
         ICalTask task = (ICalTask)mgr.getPublishedTasks().iterator().next();
-        assertEquals(0, actionContext.getLogCalls());
         assertTrue(executor.hasDelays());
-        assertEquals(59000, (long)executor.getDelayForTask(task));
+        assertEquals(59000, (long) executor.getDelayForTask(task));
 
         // force task to fire
         executor.clearDelays();
@@ -514,22 +505,79 @@ public class ICalTaskProviderTest {
                 "RRULE:FREQ=DAILY\n" +
                 "X-SUN-OFFSET:SS30\n" +
                 "SUMMARY:My Task\n" +
-                "COMMENT:[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'Test'}}]\n" +
+                "X-ACTION-SET:foo\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
         // start the scheduler after the task should have run
         MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
-        MockActionManager actionManager = new MockActionManager();
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.setActionManager(actionManager);
         s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
 
         assertEquals(1, mgr.getPublishedTasks().size());
         ICalTask t = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertTrue(t.getProperties().containsKey(ICalTask.PROP_ERROR));
+    }
+
+    @Test
+    public void testOnCreateTask() throws Exception {
+        File scheduleFile = File.createTempFile("hobson", "ics");
+        scheduleFile.deleteOnExit();
+
+        PluginContext pctx = PluginContext.createLocal("pluginId");
+        MockTaskManager tm = new MockTaskManager();
+        MockScheduledTaskExecutor ste = new MockScheduledTaskExecutor();
+
+        String ical = "BEGIN:VCALENDAR\n" +
+                "VERSION:2.0\n" +
+                "PRODID:-//Whizzo Software//Hobson 1.0//EN\n" +
+                "END:VCALENDAR";
+
+        TimeZone tz = TimeZone.getTimeZone("GMT");
+        ICalTaskProvider p = new ICalTaskProvider(pctx, null, null, tz);
+        p.setTaskManager(tm);
+        p.setScheduleExecutor(ste);
+        p.setScheduleFile(scheduleFile);
+        p.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2015, 5, 20, 12, 0, 0));
+
+        Map<String,Object> values = new HashMap<>();
+        values.put("date", "20150520");
+        values.put("time", "100000Z");
+
+        p.onCreateTask(
+            "New Task",
+            new PropertyContainerSet(
+                new PropertyContainer(
+                    PropertyContainerClassContext.create(pctx, SchedulerPlugin.SCHEDULE_CONDITION_CLASS_ID),
+                    values
+                )
+            ),
+            new PropertyContainerSet(
+                "actionset1",
+                null
+            )
+        );
+
+        int checkCount = 0;
+
+        BufferedReader br = new BufferedReader(new FileReader(scheduleFile));
+        String s;
+        while ((s = br.readLine()) != null) {
+            if ("X-ACTION-SET:actionset1".equals(s.trim())) {
+                checkCount++;
+            }
+            if ("SUMMARY:New Task".equals(s.trim())) {
+                checkCount++;
+            }
+            if ("DTSTART:20150520T100000Z".equals(s.trim())) {
+                checkCount++;
+            }
+        }
+        br.close();
+
+        assertEquals(3, checkCount);
     }
 }

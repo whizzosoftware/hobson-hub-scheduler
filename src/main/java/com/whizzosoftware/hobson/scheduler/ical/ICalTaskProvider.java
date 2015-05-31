@@ -9,8 +9,8 @@ package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.api.HobsonNotFoundException;
 import com.whizzosoftware.hobson.api.HobsonRuntimeException;
-import com.whizzosoftware.hobson.api.action.ActionManager;
 import com.whizzosoftware.hobson.api.plugin.PluginContext;
+import com.whizzosoftware.hobson.api.property.PropertyContainerSet;
 import com.whizzosoftware.hobson.api.task.HobsonTask;
 import com.whizzosoftware.hobson.api.task.TaskContext;
 import com.whizzosoftware.hobson.api.task.TaskManager;
@@ -32,7 +32,6 @@ import net.fortuna.ical4j.model.property.CalScale;
 import net.fortuna.ical4j.model.property.ProdId;
 import net.fortuna.ical4j.model.property.Uid;
 import net.fortuna.ical4j.model.property.Version;
-import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -55,7 +54,6 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
     private PluginContext ctx;
     private TaskManager taskManager;
     private DayResetListener dayResetListener;
-    private ActionManager actionManager;
     private Calendar calendar;
     private ScheduledTaskExecutor executor;
     private File scheduleFile;
@@ -118,6 +116,8 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
         logger.debug("Adding task {} with ID: {}", task.getName(), task.getContext().getTaskId());
         if (taskManager != null) {
             taskManager.publishTask(task);
+        } else {
+            logger.error("No task manager set; unable to publish task");
         }
         return scheduleNextRun(task, now, wasDayReset);
     }
@@ -138,7 +138,7 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
         long endOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
         boolean shouldRunToday = false;
 
-        task.getProperties().put(ICalTask.PROP_SCHEDULED, false);
+        task.setProperty(ICalTask.PROP_SCHEDULED, false);
 
         try {
             // check if there is more than 1 run in the next two days
@@ -163,15 +163,15 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
                     }
                 }
                 if (nextRunTime > 0) {
-                    task.getProperties().put(ICalTask.PROP_NEXT_RUN_TIME, nextRunTime);
+                    task.setProperty(ICalTask.PROP_NEXT_RUN_TIME, nextRunTime);
                     if (nextRunTime < endOfToday) {
-                        task.getProperties().put(ICalTask.PROP_SCHEDULED, true);
+                        task.setProperty(ICalTask.PROP_SCHEDULED, true);
                         executor.schedule(task, nextRunTime - now);
                     }
                 }
             }
         } catch (SchedulingException e) {
-            task.getProperties().put(ICalTask.PROP_ERROR, e.getLocalizedMessage());
+            task.setProperty(ICalTask.PROP_ERROR, e.getLocalizedMessage());
         }
 
         return shouldRunToday;
@@ -213,10 +213,6 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
 
     public void setScheduleExecutor(ScheduledTaskExecutor executor) {
         this.executor = executor;
-    }
-
-    public void setActionManager(ActionManager actionManager) {
-        this.actionManager = actionManager;
     }
 
     public void start() {
@@ -310,6 +306,8 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
         executor.cancelAll();
         if (taskManager != null) {
             taskManager.unpublishAllTasks(ctx);
+        } else {
+            logger.error("No task manager set; unable to clear tasks");
         }
     }
 
@@ -326,11 +324,11 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
         // clear all existing scheduled tasks
         clearAllTasks();
 
-        // iterate through all events and schedule them if they are supposed to run today
+        // iterate through all events, add them to the internal store and schedule them if they are supposed to run today
         ComponentList eventList = calendar.getComponents(Component.VEVENT);
         for (Object anEventList : eventList) {
             VEvent event = (VEvent)anEventList;
-            ICalTask task = new ICalTask(actionManager, ctx, event, this);
+            ICalTask task = new ICalTask(taskManager, ctx, event, this);
             task.setLatitude(latitude);
             task.setLongitude(longitude);
             if (addTask(task, now, wasDayReset)) {
@@ -371,28 +369,28 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
     }
 
     @Override
-    public void onCreateTask(Object config) {
+    public void onCreateTask(String name, PropertyContainerSet conditionSet, PropertyContainerSet actionSet) {
         try {
-            JSONObject json = (JSONObject)config;
-            ICalTask ict = new ICalTask(actionManager, TaskContext.create(getPluginContext(), UUID.randomUUID().toString()), json);
+            ICalTask ict = new ICalTask(taskManager, TaskContext.create(getPluginContext(), UUID.randomUUID().toString()), name, conditionSet, actionSet);
             ict.setLatitude(latitude);
             ict.setLongitude(longitude);
             calendar.getComponents().add(ict.getVEvent());
             writeFile();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new HobsonRuntimeException("Error creating task", e);
         }
     }
 
     @Override
-    public void onUpdateTask(HobsonTask task, Object config) {
+    public void onUpdateTask(TaskContext ctx, String name, PropertyContainerSet conditionSet, PropertyContainerSet actionSet) {
         try {
+            HobsonTask task = taskManager.getTask(ctx);
             if (task instanceof ICalTask) {
                 ICalTask icTask = (ICalTask)task;
                 // remove scheduled event from calendar
                 calendar.getComponents().remove(icTask.getVEvent());
                 // update task
-                icTask.update(task.getContext().getTaskId(), (JSONObject)config);
+                icTask.update(task.getContext().getTaskId(), name, conditionSet, actionSet);
                 // add new scheduled event to calendar
                 calendar.getComponents().add(icTask.getVEvent());
                 writeFile();
@@ -400,19 +398,24 @@ public class ICalTaskProvider implements TaskProvider, FileWatcherListener, Task
                 throw new HobsonNotFoundException("The specified task was not found or invalid");
             }
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            throw new HobsonRuntimeException("Error updating task", e);
         }
     }
 
     @Override
-    public void onDeleteTask(HobsonTask task) {
-        if (task != null && task instanceof ICalTask) {
-            ICalTask icTask = (ICalTask)task;
-            // remove the task from the calendar and write out a new calendar file
-            calendar.getComponents().remove(icTask.getVEvent());
-            writeFile();
-        } else {
-            logger.error("Unable to find task for removal: {}", task.getContext());
+    public void onDeleteTask(TaskContext ctx) {
+        try {
+            HobsonTask task = taskManager.getTask(ctx);
+            if (task != null && task instanceof ICalTask) {
+                ICalTask icTask = (ICalTask)task;
+                // remove the task from the calendar and write out a new calendar file
+                calendar.getComponents().remove(icTask.getVEvent());
+                writeFile();
+            } else {
+                logger.error("Unable to find task for removal: {}", task.getContext());
+            }
+        } catch (Exception e) {
+            throw new HobsonRuntimeException("Error deleting task", e);
         }
     }
 }

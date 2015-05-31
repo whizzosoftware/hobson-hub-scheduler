@@ -7,7 +7,7 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.ical;
 
-import com.whizzosoftware.hobson.api.action.ActionManager;
+import com.whizzosoftware.hobson.api.task.TaskManager;
 import org.apache.commons.beanutils.MethodUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -25,17 +25,17 @@ import java.util.List;
 public class ICalAction implements Runnable {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    private ActionManager actionManager;
+    private TaskManager taskManager;
     private String method;
     private final List<Object> values = new ArrayList<Object>();
 
-    public ICalAction(ActionManager context, String method) {
-        this.actionManager = context;
+    public ICalAction(TaskManager taskManager, String method) {
+        this.taskManager = taskManager;
         this.method = method;
     }
 
-    public ICalAction(ActionManager context, JSONObject json) throws JSONException {
-        this.actionManager = context;
+    public ICalAction(TaskManager taskManager, JSONObject json) throws JSONException {
+        this.taskManager = taskManager;
         this.method = json.getString("method");
 
         int k = 1;
@@ -60,7 +60,7 @@ public class ICalAction implements Runnable {
     @Override
     public void run() {
         try {
-            MethodUtils.invokeMethod(actionManager, method, values.toArray());
+            MethodUtils.invokeMethod(taskManager, method, values.toArray());
         } catch (Throwable t) {
             logger.error("Unable to invoke method: " + method, t);
         }

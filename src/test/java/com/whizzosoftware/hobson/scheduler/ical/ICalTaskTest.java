@@ -7,10 +7,11 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.ical;
 
-import com.whizzosoftware.hobson.api.action.HobsonActionRef;
-import com.whizzosoftware.hobson.api.action.MockActionManager;
 import com.whizzosoftware.hobson.api.plugin.PluginContext;
-import com.whizzosoftware.hobson.api.task.TaskContext;
+import com.whizzosoftware.hobson.api.property.PropertyContainer;
+import com.whizzosoftware.hobson.api.property.PropertyContainerClassContext;
+import com.whizzosoftware.hobson.api.property.PropertyContainerSet;
+import com.whizzosoftware.hobson.api.task.MockTaskManager;
 import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.data.CalendarBuilder;
@@ -24,23 +25,17 @@ import net.fortuna.ical4j.model.property.RRule;
 import net.fortuna.ical4j.model.property.Uid;
 import net.fortuna.ical4j.model.property.XProperty;
 import net.fortuna.ical4j.util.UidGenerator;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.json.JSONTokener;
 import org.junit.Test;
 
 import java.io.File;
 import java.io.FileReader;
-import java.util.Collection;
-import java.util.List;
-import java.util.Map;
-import java.util.TimeZone;
+import java.util.*;
 
 import static org.junit.Assert.*;
 
 public class ICalTaskTest {
     @Test
-    public void testConstructorWithNoActions() throws Exception {
+    public void testConstructorWithNoActionSetId() throws Exception {
         PluginContext ctx = PluginContext.createLocal("pluginId");
         VEvent event = new VEvent(new DateTime(), "task1");
         event.getProperties().add(new Uid("uid"));
@@ -56,35 +51,31 @@ public class ICalTaskTest {
         PluginContext ctx = PluginContext.createLocal("pluginId");
         VEvent event = new VEvent(new DateTime(), "task2");
         event.getProperties().add(new Uid("uid2"));
-        event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
+        event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         ICalTask task = new ICalTask(null, ctx, event, null);
         assertEquals("uid2", task.getContext().getTaskId());
         assertEquals("task2", task.getName());
-        assertNotNull(task.getActions());
-        assertEquals(1, task.getActions().size());
-        HobsonActionRef action = task.getActions().iterator().next();
-        assertEquals("log", action.getActionId());
-        assertEquals("My Action", action.getName());
-        assertEquals("com.whizzosoftware.hobson.server-api", action.getPluginId());
+        assertEquals("foo", task.getActionSet().getId());
     }
 
     @Test
     public void testGetConditions() throws Exception {
         PluginContext ctx = PluginContext.createLocal("pluginId");
         TimeZone tz = TimeZone.getTimeZone("GMT");
-        VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0)), "task1");
+        long time = DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0);
+        VEvent event = new VEvent(new DateTime(time), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
-        event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
+        event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         Recur recur = new Recur("FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13");
         event.getProperties().add(new RRule(recur));
 
         ICalTask task = new ICalTask(null, ctx, event, null);
 
-        Collection<Map<String,Object>> conditions = task.getConditions();
-        assertEquals(1, conditions.size());
-        Map<String,Object> map = conditions.iterator().next();
-        assertEquals(2, map.size());
-        assertEquals("20010412T180000", map.get("start"));
+        assertTrue(task.getConditionSet().hasPrimaryProperty());
+        Map<String,Object> map = task.getConditionSet().getPrimaryProperty().getPropertyValues();
+        assertEquals(3, map.size());
+        assertEquals("20010412", map.get("date"));
+        assertEquals("180000", map.get("time"));
         assertEquals("FREQ=MONTHLY;BYMONTHDAY=13;BYDAY=FR", map.get("recurrence"));
     }
 
@@ -94,20 +85,19 @@ public class ICalTaskTest {
         TimeZone tz = TimeZone.getTimeZone("GMT");
         VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
-        event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
+        event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         Recur recur = new Recur("FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13");
         event.getProperties().add(new RRule(recur));
         event.getProperties().add(new XProperty(ICalTask.PROP_SUN_OFFSET, "SS"));
 
         ICalTask task = new ICalTask(null, ctx, event, null);
 
-        Collection<Map<String,Object>> conditions = task.getConditions();
-        assertEquals(1, conditions.size());
-        Map<String,Object> map = conditions.iterator().next();
+        assertTrue(task.getConditionSet().hasPrimaryProperty());
+        Map<String,Object> map = task.getConditionSet().getPrimaryProperty().getPropertyValues();
         assertEquals(3, map.size());
-        assertEquals("20010412T180000", map.get("start"));
+        assertEquals("20010412", map.get("date"));
         assertEquals("FREQ=MONTHLY;BYMONTHDAY=13;BYDAY=FR", map.get("recurrence"));
-        assertEquals("SS", map.get("sunOffset"));
+        assertEquals("SS", map.get("time"));
     }
 
     @Test
@@ -118,6 +108,7 @@ public class ICalTaskTest {
         // event starts on 4/13/2001 and goes monthly every friday the 13th
         VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
+        event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
         Recur recur = new Recur("FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13");
         event.getProperties().add(new RRule(recur));
@@ -146,7 +137,7 @@ public class ICalTaskTest {
         // create event
         VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 6, 1, 9, 0, 0)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
-        event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
+        event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         Recur recur = new Recur("FREQ=DAILY;INTERVAL=3");
         event.getProperties().add(new RRule(recur));
 
@@ -201,8 +192,24 @@ public class ICalTaskTest {
         try {
             provider.setScheduleFile(calendarFile);
             provider.reloadScheduleFile();
-            JSONObject json = new JSONObject(new JSONTokener("{'name':'My Task','conditions':[{'start':'20140701T100000','recurrence':'FREQ=MINUTELY;INTERVAL=1'}],'actions':[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'logentry'}}]}"));
-            provider.onCreateTask(json);
+
+            Map<String,Object> props = new HashMap<>();
+            props.put("date", "2014-07-01");
+            props.put("time", "10:00:00Z");
+            props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
+            provider.onCreateTask(
+                "My Task",
+                new PropertyContainerSet(
+                    new PropertyContainer(
+                        PropertyContainerClassContext.create(PluginContext.createLocal("pluginId"), "foo"),
+                        props
+                    )
+                ),
+                new PropertyContainerSet(
+                    "foo",
+                    null
+                )
+            );
 
             // make sure the provider updated the rule file
             assertTrue(calendarFile.exists());
@@ -216,18 +223,11 @@ public class ICalTaskTest {
             assertNotNull(event.getUid().getValue());
             assertEquals("My Task", event.getSummary().getValue());
 
-            assertEquals("20140701T100000", event.getProperties().getProperty("DTSTART").getValue());
+            assertEquals("20140701T100000Z", event.getProperties().getProperty("DTSTART").getValue());
             assertEquals("FREQ=MINUTELY;INTERVAL=1", event.getProperties().getProperty("RRULE").getValue());
 
-            assertNotNull(event.getProperties().getProperty("COMMENT"));
-            JSONArray jarray = new JSONArray(new JSONTokener(event.getProperties().getProperty("COMMENT").getValue()));
-            assertEquals(1, jarray.length());
-            JSONObject ajson = jarray.getJSONObject(0);
-            assertEquals("com.whizzosoftware.hobson.server-api", ajson.getString("pluginId"));
-            assertEquals("log", ajson.getString("actionId"));
-            assertTrue(ajson.has("properties"));
-            JSONObject props = ajson.getJSONObject("properties");
-            assertEquals("logentry", props.getString("message"));
+            assertNotNull(event.getProperties().getProperty(ICalTask.PROP_ACTION_SET));
+            assertEquals("foo", event.getProperties().getProperty(ICalTask.PROP_ACTION_SET).getValue());
         } finally {
             assertTrue(calendarFile.delete());
         }
@@ -246,8 +246,24 @@ public class ICalTaskTest {
         try {
             provider.setScheduleFile(calendarFile);
             provider.reloadScheduleFile();
-            JSONObject json = new JSONObject(new JSONTokener("{'name':'My Task','conditions':[{'start':'20140701T100000','recurrence':'FREQ=MINUTELY;INTERVAL=1','sunOffset':'SR'}],'actions':[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'logentry'}}]}"));
-            provider.onCreateTask(json);
+
+            Map<String,Object> props = new HashMap<>();
+            props.put("date", "2014-07-01");
+            props.put("time", "SR");
+            props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
+            provider.onCreateTask(
+                "My Task",
+                new PropertyContainerSet(
+                    new PropertyContainer(
+                        PropertyContainerClassContext.create(PluginContext.createLocal("pluginId"), "foo"),
+                        props
+                    )
+                ),
+                new PropertyContainerSet(
+                    "foo",
+                    null
+                )
+            );
 
             // make sure the provider updated the rule file
             assertTrue(calendarFile.exists());
@@ -261,19 +277,12 @@ public class ICalTaskTest {
             assertNotNull(event.getUid().getValue());
             assertEquals("My Task", event.getSummary().getValue());
 
-            assertEquals("20140701T100000", event.getProperties().getProperty("DTSTART").getValue());
+            assertEquals("20140701T000000", event.getProperties().getProperty("DTSTART").getValue());
             assertEquals("FREQ=MINUTELY;INTERVAL=1", event.getProperties().getProperty("RRULE").getValue());
             assertEquals("SR", event.getProperties().getProperty(ICalTask.PROP_SUN_OFFSET).getValue());
 
-            assertNotNull(event.getProperties().getProperty("COMMENT"));
-            JSONArray jarray = new JSONArray(new JSONTokener(event.getProperties().getProperty("COMMENT").getValue()));
-            assertEquals(1, jarray.length());
-            JSONObject ajson = jarray.getJSONObject(0);
-            assertEquals("com.whizzosoftware.hobson.server-api", ajson.getString("pluginId"));
-            assertEquals("log", ajson.getString("actionId"));
-            assertTrue(ajson.has("properties"));
-            JSONObject props = ajson.getJSONObject("properties");
-            assertEquals("logentry", props.getString("message"));
+            assertNotNull(event.getProperties().getProperty("X-ACTION-SET"));
+            assertEquals("foo", event.getProperties().getProperty("X-ACTION-SET").getValue());
         } finally {
             assertTrue(calendarFile.delete());
         }
@@ -282,11 +291,11 @@ public class ICalTaskTest {
     @Test
     public void testSunOffset() throws Exception {
         PluginContext ctx = PluginContext.createLocal("pluginId");
-        MockActionManager am = new MockActionManager();
+        MockTaskManager am = new MockTaskManager();
         TimeZone tz = TimeZone.getTimeZone("America/Denver");
         VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
-        event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
+        event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         event.getProperties().add(new XProperty(ICalTask.PROP_SUN_OFFSET, "SS+30"));
         Recur recur = new Recur("FREQ=DAILY;INTERVAL=1");
         event.getProperties().add(new RRule(recur));
@@ -317,11 +326,11 @@ public class ICalTaskTest {
     @Test
     public void testGetRunsForIntervalWithNoLatLong() throws Exception {
         PluginContext ctx = PluginContext.createLocal("pluginId");
-        MockActionManager am = new MockActionManager();
+        MockTaskManager am = new MockTaskManager();
         TimeZone tz = TimeZone.getTimeZone("America/Denver");
         VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
-        event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
+        event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         event.getProperties().add(new XProperty(ICalTask.PROP_SUN_OFFSET, "SS+30"));
         Recur recur = new Recur("FREQ=DAILY;INTERVAL=1");
         event.getProperties().add(new RRule(recur));
@@ -333,5 +342,28 @@ public class ICalTaskTest {
             runs = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 10, 19, 23, 59, 59));
             fail("Should have thrown exception");
         } catch (SchedulingException ignored) {}
+    }
+
+    @Test
+    public void testCreateDescription() throws Exception {
+//        MockTaskManager tm = new MockTaskManager();
+//
+//        HubContext hctx = HubContext.createLocal();
+//        PluginContext pctx = PluginContext.create(hctx, "plugin");
+//
+//        // publish an action set to reference
+//        List<TaskActionMetadata> actions = new ArrayList<>();
+//        actions.add(new TaskActionMetadata(TaskActionClassContext.create(pctx, "turnOff"), null));
+//        TaskActionSet as = tm.publishActionSet(hctx, "as", actions);
+//
+//        // publish a condition class to reference
+//        tm.publishConditionClass(new ScheduleConditionClass(pctx));
+//
+//        // create task properties
+//        Map<String,Object> props = new HashMap<>();
+//        props.put("date", "20150518");
+//        props.put("time", "100000Z");
+//
+//        assertEquals("", new ICalTask(tm, TaskContext.create(pctx, "tid"), "Test", new TaskConditionMetadata(TaskConditionClassContext.create(pctx, "schedule"), props), null, as.getId()).createDescription());
     }
 }
