@@ -199,7 +199,7 @@ public class ICalTaskTest {
             props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
             provider.onCreateTask(
                 "My Task",
-                new PropertyContainerSet(
+                    null, new PropertyContainerSet(
                     new PropertyContainer(
                         PropertyContainerClassContext.create(PluginContext.createLocal("pluginId"), "foo"),
                         props
@@ -253,7 +253,7 @@ public class ICalTaskTest {
             props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
             provider.onCreateTask(
                 "My Task",
-                new PropertyContainerSet(
+                    null, new PropertyContainerSet(
                     new PropertyContainer(
                         PropertyContainerClassContext.create(PluginContext.createLocal("pluginId"), "foo"),
                         props

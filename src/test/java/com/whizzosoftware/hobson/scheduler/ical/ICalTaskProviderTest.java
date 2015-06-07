@@ -205,6 +205,7 @@ public class ICalTaskProviderTest {
             p.onUpdateTask(
                 ctx,
                 "My Edited Task",
+                "My Task Description",
                 new PropertyContainerSet(
                     new PropertyContainer(
                         PropertyContainerClassContext.create(PluginContext.createLocal("pluginId"), "foo"),
@@ -214,8 +215,7 @@ public class ICalTaskProviderTest {
                 new PropertyContainerSet(
                     "log",
                     null
-                )
-            );
+                ));
             assertTrue(file.exists());
 
             // read back file
@@ -549,7 +549,7 @@ public class ICalTaskProviderTest {
 
         p.onCreateTask(
             "New Task",
-            new PropertyContainerSet(
+                null, new PropertyContainerSet(
                 new PropertyContainer(
                     PropertyContainerClassContext.create(pctx, SchedulerPlugin.SCHEDULE_CONDITION_CLASS_ID),
                     values

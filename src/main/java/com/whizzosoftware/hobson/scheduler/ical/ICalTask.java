@@ -89,10 +89,10 @@ public class ICalTask extends HobsonTask implements Runnable {
         }
     }
 
-    public ICalTask(TaskManager taskManager, TaskContext ctx, String name, PropertyContainerSet conditionSet, PropertyContainerSet actionSet) {
+    public ICalTask(TaskManager taskManager, TaskContext ctx, String name, String description, PropertyContainerSet conditionSet, PropertyContainerSet actionSet) {
         this.taskManager = taskManager;
         setContext(ctx);
-        update(ctx.getTaskId(), name, conditionSet, actionSet);
+        update(ctx.getTaskId(), name, description, conditionSet, actionSet);
     }
 
     protected PropertyContainerSet createConditionSet(VEvent event) {
@@ -128,12 +128,14 @@ public class ICalTask extends HobsonTask implements Runnable {
         );
     }
 
-    public void update(String id, String name, PropertyContainerSet conditionSet, PropertyContainerSet actionSet) {
+    public void update(String id, String name, String description, PropertyContainerSet conditionSet, PropertyContainerSet actionSet) {
         // at this point, we require an action set ID
         if (!actionSet.hasId()) {
             throw new HobsonRuntimeException("Action set has no ID");
         }
 
+        setName(name);
+        setDescription(description);
         setConditionSet(conditionSet);
         setActionSet(actionSet);
 
