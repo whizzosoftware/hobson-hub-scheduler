@@ -129,6 +129,11 @@ public class ICalTask extends HobsonTask implements Runnable {
     }
 
     public void update(String id, String name, PropertyContainerSet conditionSet, PropertyContainerSet actionSet) {
+        // at this point, we require an action set ID
+        if (!actionSet.hasId()) {
+            throw new HobsonRuntimeException("Action set has no ID");
+        }
+
         setConditionSet(conditionSet);
         setActionSet(actionSet);
 
@@ -154,7 +159,10 @@ public class ICalTask extends HobsonTask implements Runnable {
                     }
                 }
                 if (triggerCondition.hasPropertyValue("recurrence")) {
-                    event.getProperties().add(new RRule((String)triggerCondition.getPropertyValue("recurrence")));
+                    String r = (String)triggerCondition.getPropertyValue("recurrence");
+                    if (r.length() > 0) {
+                        event.getProperties().add(new RRule(r));
+                    }
                 }
                 if (actionSet.hasId()) {
                     event.getProperties().add(new XProperty(PROP_ACTION_SET, actionSet.getId()));
