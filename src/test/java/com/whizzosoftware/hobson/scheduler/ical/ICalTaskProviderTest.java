@@ -19,6 +19,7 @@ import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.data.CalendarBuilder;
 import net.fortuna.ical4j.model.Calendar;
 import net.fortuna.ical4j.model.component.VEvent;
+import org.joda.time.DateTimeZone;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.junit.Test;
@@ -55,7 +56,7 @@ public class ICalTaskProviderTest {
 
     @Test
     public void testClearAllTasks() throws Exception {
-        TimeZone tz = TimeZone.getTimeZone("GMT");
+        DateTimeZone tz = DateTimeZone.forID("GMT");
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
 
         // make sure executor has no delays already set
@@ -73,7 +74,7 @@ public class ICalTaskProviderTest {
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
-        long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
+        long startOfDay = DateHelper.getTime(2013, 7, 14, 0, 0, 0, tz);
 
         MockTaskManager mgr = new MockTaskManager();
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
@@ -92,7 +93,7 @@ public class ICalTaskProviderTest {
 
     @Test
     public void testLoadScheduleWithSingleEvent() throws Exception {
-        TimeZone tz = TimeZone.getTimeZone("GMT");
+        DateTimeZone tz = DateTimeZone.forID("GMT");
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
@@ -105,7 +106,7 @@ public class ICalTaskProviderTest {
                 "END:VCALENDAR";
 
         // assert what happens the day OF the event
-        long startOfDay = DateHelper.getTime(tz, 2013, 7, 14, 0, 0, 0);
+        long startOfDay = DateHelper.getTime(2013, 7, 14, 0, 0, 0, tz);
 
         MockTaskManager manager = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
@@ -123,7 +124,7 @@ public class ICalTaskProviderTest {
         assertEquals(61200000, (long)executor.getDelayForTask(t));
 
         // assert what happens the day AFTER the event
-        startOfDay = DateHelper.getTime(tz, 2013, 7, 15, 0, 0, 0);
+        startOfDay = DateHelper.getTime(2013, 7, 15, 0, 0, 0, tz);
         executor.clearDelays();
         s.resetForNewDay(startOfDay);
 
@@ -169,7 +170,7 @@ public class ICalTaskProviderTest {
             fw.close();
 
             MockTaskManager mgr = new MockTaskManager();
-            ICalTaskProvider p = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, TimeZone.getTimeZone("America/Denver"));
+            ICalTaskProvider p = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, DateTimeZone.forID("America/Denver"));
             p.setTaskManager(mgr);
             p.setScheduleExecutor(new MockScheduledTaskExecutor());
             p.setScheduleFile(file);
@@ -232,19 +233,19 @@ public class ICalTaskProviderTest {
 
     @Test
     public void testLoadScheduleWithSingleEventWithSunsetOffset() throws Exception {
-        TimeZone tz = TimeZone.getTimeZone("America/Denver");
+        DateTimeZone tz = DateTimeZone.forID("America/Denver");
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
                 "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
-                "DTSTART:20141018T000000\n" +
+                "DTSTART;TZID=America/Denver:20141018T000000\n" +
                 "SUMMARY:My Task\n" +
                 "X-SUN-OFFSET: SS30\n" +
                 "X-ACTION-SET:foo\n" +
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
-        long startOfDay = DateHelper.getTime(tz, 2014, 10, 18, 0, 0, 0);
+        long startOfDay = DateHelper.getTime(2014, 10, 18, 0, 0, 0, tz);
 
         MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
@@ -265,7 +266,7 @@ public class ICalTaskProviderTest {
 
     @Test
     public void testDayReset() throws Exception {
-        TimeZone tz = TimeZone.getTimeZone("GMT");
+        DateTimeZone tz = DateTimeZone.forID("GMT");
 
         // an event that runs every day at midnight
         String ical = "BEGIN:VCALENDAR\n" +
@@ -279,7 +280,7 @@ public class ICalTaskProviderTest {
                 "END:VEVENT\n" +
                 "END:VCALENDAR";
 
-        long schedulerStart = DateHelper.getTime(tz, 2014, 7, 1, 8, 0, 0);
+        long schedulerStart = DateHelper.getTime(2014, 7, 1, 8, 0, 0, tz);
 
         MockTaskManager mgr = new MockTaskManager();
         MockScheduledTaskExecutor executor = new MockScheduledTaskExecutor();
@@ -292,7 +293,7 @@ public class ICalTaskProviderTest {
         assertEquals(1, mgr.getPublishedTasks().size());
 
         // reload the file at midnight
-        s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 0));
+        s.resetForNewDay(DateHelper.getTime(2014, 7, 2, 0, 0, 0, tz));
 
         // verify task was created but not executed
         assertEquals(1, mgr.getPublishedTasks().size());
@@ -300,14 +301,14 @@ public class ICalTaskProviderTest {
 
     @Test
     public void testDelayedDayReset() throws Exception {
-        TimeZone tz = TimeZone.getDefault();
+        DateTimeZone tz = DateTimeZone.forID("GMT");
 
         // an event that runs every day at midnight
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
                 "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
-                "DTSTART:20140701T000000\n" +
+                "DTSTART:20140701T000000Z\n" +
                 "RRULE:FREQ=DAILY\n" +
                 "SUMMARY:My Task\n" +
                 "X-ACTION-SET:foo\n" +
@@ -320,7 +321,7 @@ public class ICalTaskProviderTest {
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 17, 0, 0));
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(2014, 7, 1, 17, 0, 0, tz));
 
         // verify task was not scheduled
         assertEquals(1, mgr.getPublishedTasks().size());
@@ -329,26 +330,26 @@ public class ICalTaskProviderTest {
         // start a new day 30 seconds after midnight -- this covers the corner case where a delay causes the
         // resetForNewDay() method to get fired slightly after midnight and there are tasks that should have
         // already executed by then
-        s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 30));
+        s.resetForNewDay(DateHelper.getTime(2014, 7, 2, 0, 0, 30, tz));
 
         // verify task was not scheduled but task executed
         assertEquals(1, mgr.getPublishedTasks().size());
         ICalTask task = (ICalTask)mgr.getPublishedTasks().iterator().next();
         assertFalse(executor.isTaskScheduled(task));
-        assertEquals(1404367200000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
+        assertEquals(1404345600000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
         assertFalse((boolean) task.getProperties().get(ICalTask.PROP_SCHEDULED));
     }
 
     @Test
     public void testDayResetWithSolarOffsetTask() throws Exception {
-        TimeZone tz = TimeZone.getDefault();
+        DateTimeZone tz = DateTimeZone.forID("America/Denver");
 
         // an event that runs every day 30 minutes after sunset
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
                 "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
-                "DTSTART:20140701T000000\n" +
+                "DTSTART;TZID=America/Denver:20140701T000000\n" +
                 "RRULE:FREQ=DAILY\n" +
                 "X-SUN-OFFSET:SS30\n" +
                 "X-ACTION-SET:foo\n" +
@@ -364,7 +365,7 @@ public class ICalTaskProviderTest {
         s.setTaskManager(mgr);
         s.setLatitudeLongitude(39.3722, -104.8561);
         s.setScheduleExecutor(executor);
-        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(2014, 7, 1, 22, 0, 0, tz));
 
         // verify task was not scheduled or executed
         assertEquals(1, mgr.getPublishedTasks().size());
@@ -373,7 +374,7 @@ public class ICalTaskProviderTest {
         assertNotNull(t.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
 
         // start a new day at midnight
-        s.resetForNewDay(DateHelper.getTime(tz, 2014, 7, 2, 0, 0, 0));
+        s.resetForNewDay(DateHelper.getTime(2014, 7, 2, 0, 0, 0, tz));
 
         // verify task was scheduled at appropriate time and task did not execute
         assertEquals(1, mgr.getPublishedTasks().size());
@@ -386,14 +387,14 @@ public class ICalTaskProviderTest {
 
     @Test
     public void testMonthlyNextRun() throws Exception {
-        TimeZone tz = TimeZone.getDefault();
+        DateTimeZone tz = DateTimeZone.forID("GMT");
 
         // an event that runs every day at midnight
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
                 "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
-                "DTSTART:20140701T220000\n" +
+                "DTSTART:20140701T220000Z\n" +
                 "RRULE:FREQ=MONTHLY\n" +
                 "SUMMARY:My Task\n" +
                 "X-ACTION-SET:foo\n" +
@@ -406,24 +407,24 @@ public class ICalTaskProviderTest {
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 23, 0, 0));
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(2014, 7, 1, 23, 0, 0, tz));
 
         // verify task was created and its next run time
         assertEquals(1, mgr.getPublishedTasks().size());
         ICalTask task = (ICalTask)mgr.getPublishedTasks().iterator().next();
-        assertEquals(1406952000000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
+        assertEquals(1406930400000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
     }
 
     @Test
     public void testYearlyNextRun() throws Exception {
-        TimeZone tz = TimeZone.getDefault();
+        DateTimeZone tz = DateTimeZone.forID("GMT");
 
         // an event that runs every day at midnight
         String ical = "BEGIN:VCALENDAR\n" +
                 "VERSION:2.0\n" +
                 "BEGIN:VEVENT\n" +
                 "UID:15dee4fe-a841-4cf6-8d7f-76c3ad5492b1\n" +
-                "DTSTART:20140701T220000\n" +
+                "DTSTART:20140701T220000Z\n" +
                 "RRULE:FREQ=YEARLY\n" +
                 "SUMMARY:My Task\n" +
                 "X-ACTION-SET:foo\n" +
@@ -436,17 +437,17 @@ public class ICalTaskProviderTest {
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 8, 1, 21, 0, 0));
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(2014, 8, 1, 21, 0, 0, tz));
 
         // verify task was created and its next run time
         assertEquals(1, mgr.getPublishedTasks().size());
         ICalTask task = (ICalTask)mgr.getPublishedTasks().iterator().next();
-        assertEquals(1435809600000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
+        assertEquals(1435788000000l, task.getProperties().get(ICalTask.PROP_NEXT_RUN_TIME));
     }
 
     @Test
     public void testTaskRescheduling() throws Exception {
-        TimeZone tz = TimeZone.getTimeZone("GMT");
+        DateTimeZone tz = DateTimeZone.forID("GMT");
 
         // an event that runs every minute
         String ical = "BEGIN:VCALENDAR\n" +
@@ -475,7 +476,7 @@ public class ICalTaskProviderTest {
         scheduler.setScheduleExecutor(executor);
 
         assertFalse(executor.hasDelays());
-        scheduler.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 11, 0, 1));
+        scheduler.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(2014, 7, 1, 11, 0, 1, tz));
 
         // verify task was created and scheduled
         assertEquals(1, mgr.getPublishedTasks().size());
@@ -485,7 +486,7 @@ public class ICalTaskProviderTest {
 
         // force task to fire
         executor.clearDelays();
-        scheduler.onTaskExecuted(task, DateHelper.getTime(tz, 2014, 7, 1, 11, 1, 0), true);
+        scheduler.onTaskExecuted(task, DateHelper.getTime(2014, 7, 1, 11, 1, 0, tz), true);
 
         // verify that task was scheduled again
         assertTrue(executor.hasDelays());
@@ -494,7 +495,7 @@ public class ICalTaskProviderTest {
 
     @Test
     public void testSunOffsetWithNoLatLong() throws Exception {
-        TimeZone tz = TimeZone.getDefault();
+        DateTimeZone tz = DateTimeZone.getDefault();
 
         // an event that runs every day at midnight
         String ical = "BEGIN:VCALENDAR\n" +
@@ -515,7 +516,7 @@ public class ICalTaskProviderTest {
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2014, 7, 1, 22, 0, 0));
+        s.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(2014, 7, 1, 22, 0, 0, tz));
 
         assertEquals(1, mgr.getPublishedTasks().size());
         ICalTask t = (ICalTask)mgr.getPublishedTasks().iterator().next();
@@ -536,12 +537,12 @@ public class ICalTaskProviderTest {
                 "PRODID:-//Whizzo Software//Hobson 1.0//EN\n" +
                 "END:VCALENDAR";
 
-        TimeZone tz = TimeZone.getTimeZone("GMT");
+        DateTimeZone tz = DateTimeZone.forID("GMT");
         ICalTaskProvider p = new ICalTaskProvider(pctx, null, null, tz);
         p.setTaskManager(tm);
         p.setScheduleExecutor(ste);
         p.setScheduleFile(scheduleFile);
-        p.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(tz, 2015, 5, 20, 12, 0, 0));
+        p.loadICSStream(new ByteArrayInputStream(ical.getBytes()), DateHelper.getTime(2015, 5, 20, 12, 0, 0, tz));
 
         Map<String,Object> values = new HashMap<>();
         values.put("date", "20150520");

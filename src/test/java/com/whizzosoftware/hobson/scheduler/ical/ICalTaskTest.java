@@ -25,6 +25,7 @@ import net.fortuna.ical4j.model.property.RRule;
 import net.fortuna.ical4j.model.property.Uid;
 import net.fortuna.ical4j.model.property.XProperty;
 import net.fortuna.ical4j.util.UidGenerator;
+import org.joda.time.DateTimeZone;
 import org.junit.Test;
 
 import java.io.File;
@@ -61,8 +62,8 @@ public class ICalTaskTest {
     @Test
     public void testGetConditions() throws Exception {
         PluginContext ctx = PluginContext.createLocal("pluginId");
-        TimeZone tz = TimeZone.getTimeZone("GMT");
-        long time = DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0);
+        DateTimeZone tz = DateTimeZone.forID("GMT");
+        long time = DateHelper.getTime(2001, 4, 13, 0, 0, 0, tz);
         VEvent event = new VEvent(new DateTime(time), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
         event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
@@ -74,16 +75,16 @@ public class ICalTaskTest {
         assertTrue(task.getConditionSet().hasPrimaryProperty());
         Map<String,Object> map = task.getConditionSet().getPrimaryProperty().getPropertyValues();
         assertEquals(3, map.size());
-        assertEquals("20010412", map.get("date"));
-        assertEquals("180000", map.get("time"));
+        assertEquals("20010413", map.get("date"));
+        assertEquals("000000Z", map.get("time"));
         assertEquals("FREQ=MONTHLY;BYMONTHDAY=13;BYDAY=FR", map.get("recurrence"));
     }
 
     @Test
     public void testGetConditionsWithSunOffset() throws Exception {
         PluginContext ctx = PluginContext.createLocal("pluginId");
-        TimeZone tz = TimeZone.getTimeZone("GMT");
-        VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0)), "task1");
+        DateTimeZone tz = DateTimeZone.forID("GMT");
+        VEvent event = new VEvent(new DateTime(DateHelper.getTime(2001, 4, 13, 0, 0, 0, tz)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
         event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         Recur recur = new Recur("FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13");
@@ -95,7 +96,7 @@ public class ICalTaskTest {
         assertTrue(task.getConditionSet().hasPrimaryProperty());
         Map<String,Object> map = task.getConditionSet().getPrimaryProperty().getPropertyValues();
         assertEquals(3, map.size());
-        assertEquals("20010412", map.get("date"));
+        assertEquals("20010413", map.get("date"));
         assertEquals("FREQ=MONTHLY;BYMONTHDAY=13;BYDAY=FR", map.get("recurrence"));
         assertEquals("SS", map.get("time"));
     }
@@ -103,10 +104,10 @@ public class ICalTaskTest {
     @Test
     public void testNextFridayThe13th() throws Exception {
         PluginContext ctx = PluginContext.createLocal("pluginId");
-        TimeZone tz = TimeZone.getTimeZone("GMT");
+        DateTimeZone tz = DateTimeZone.forID("GMT");
 
         // event starts on 4/13/2001 and goes monthly every friday the 13th
-        VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0)), "task1");
+        VEvent event = new VEvent(new DateTime(DateHelper.getTime(2001, 4, 13, 0, 0, 0, tz)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
         event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         event.getProperties().add(new Comment("[{'pluginId':'com.whizzosoftware.hobson.server-api','actionId':'log','name':'My Action','properties':{'message':'foo'}}]"));
@@ -115,27 +116,27 @@ public class ICalTaskTest {
 
         // check from day before first occurrence
         ICalTask task = new ICalTask(null, ctx, event, null);
-        List<Long> periods = task.getRunsDuringInterval(DateHelper.getTime(tz, 2001, 4, 12, 0, 0, 0), DateHelper.getTime(tz, 2001, 4, 14, 0, 0, 0));
+        List<Long> periods = task.getRunsDuringInterval(DateHelper.getTime(2001, 4, 12, 0, 0, 0, tz), DateHelper.getTime(2001, 4, 14, 0, 0, 0, tz), tz);
         assertEquals(1, periods.size());
 
         // check from day of first occurrence
-        long startDate = DateHelper.getTime(tz, 2001, 4, 13, 0, 0, 0);
-        periods = task.getRunsDuringInterval(startDate, DateHelper.getTime(tz, 2001, 4, 14, 0, 0, 0));
+        long startDate = DateHelper.getTime(2001, 4, 13, 0, 0, 0, tz);
+        periods = task.getRunsDuringInterval(startDate, DateHelper.getTime(2001, 4, 14, 0, 0, 0, tz), tz);
         assertEquals(1, periods.size());
 
         // check from much later date
-        startDate = DateHelper.getTime(tz, 2014, 6, 30, 0, 0, 0);
-        periods = task.getRunsDuringInterval(startDate, startDate + (1000 * 60 * 60 * 24));
+        startDate = DateHelper.getTime(2014, 6, 30, 0, 0, 0, tz);
+        periods = task.getRunsDuringInterval(startDate, startDate + (1000 * 60 * 60 * 24), tz);
         assertEquals(0, periods.size());
     }
 
     @Test
     public void testEvery3DaysAt9AM() throws Exception {
         PluginContext ctx = PluginContext.createLocal("pluginId");
-        TimeZone tz = TimeZone.getTimeZone("GMT");
+        DateTimeZone tz = DateTimeZone.forID("GMT");
 
         // create event
-        VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 6, 1, 9, 0, 0)), "task1");
+        VEvent event = new VEvent(new DateTime(DateHelper.getTime(2014, 6, 1, 9, 0, 0, tz)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
         event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         Recur recur = new Recur("FREQ=DAILY;INTERVAL=3");
@@ -143,40 +144,40 @@ public class ICalTaskTest {
 
         // check from day before first occurrence
         ICalTask task = new ICalTask(null, ctx, event, null);
-        List<Long> periods = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 6, 1, 9, 0, 0), DateHelper.getTime(tz, 2014, 8, 31, 23, 59, 59));
+        List<Long> periods = task.getRunsDuringInterval(DateHelper.getTime(2014, 6, 1, 9, 0, 0, tz), DateHelper.getTime(2014, 8, 31, 23, 59, 59, tz), tz);
         assertEquals(31, periods.size());
-        assertEquals(DateHelper.getTime(tz, 2014, 6, 1, 9, 0, 0), (long)periods.get(0));
-        assertEquals(DateHelper.getTime(tz, 2014, 6, 4, 9, 0, 0), (long)periods.get(1));
-        assertEquals(DateHelper.getTime(tz, 2014, 6, 7, 9, 0, 0), (long)periods.get(2));
-        assertEquals(DateHelper.getTime(tz, 2014, 6, 10, 9, 0, 0), (long)periods.get(3));
-        assertEquals(DateHelper.getTime(tz, 2014, 6, 13, 9, 0, 0), (long)periods.get(4));
-        assertEquals(DateHelper.getTime(tz, 2014, 6, 16, 9, 0, 0), (long)periods.get(5));
-        assertEquals(DateHelper.getTime(tz, 2014, 6, 19, 9, 0, 0), (long)periods.get(6));
-        assertEquals(DateHelper.getTime(tz, 2014, 6, 22, 9, 0, 0), (long)periods.get(7));
-        assertEquals(DateHelper.getTime(tz, 2014, 6, 25, 9, 0, 0), (long)periods.get(8));
-        assertEquals(DateHelper.getTime(tz, 2014, 6, 28, 9, 0, 0), (long)periods.get(9));
-        assertEquals(DateHelper.getTime(tz, 2014, 7, 1, 9, 0, 0), (long)periods.get(10));
-        assertEquals(DateHelper.getTime(tz, 2014, 7, 4, 9, 0, 0), (long)periods.get(11));
-        assertEquals(DateHelper.getTime(tz, 2014, 7, 7, 9, 0, 0), (long)periods.get(12));
-        assertEquals(DateHelper.getTime(tz, 2014, 7, 10, 9, 0, 0), (long)periods.get(13));
-        assertEquals(DateHelper.getTime(tz, 2014, 7, 13, 9, 0, 0), (long)periods.get(14));
-        assertEquals(DateHelper.getTime(tz, 2014, 7, 16, 9, 0, 0), (long)periods.get(15));
-        assertEquals(DateHelper.getTime(tz, 2014, 7, 19, 9, 0, 0), (long)periods.get(16));
-        assertEquals(DateHelper.getTime(tz, 2014, 7, 22, 9, 0, 0), (long)periods.get(17));
-        assertEquals(DateHelper.getTime(tz, 2014, 7, 25, 9, 0, 0), (long)periods.get(18));
-        assertEquals(DateHelper.getTime(tz, 2014, 7, 28, 9, 0, 0), (long)periods.get(19));
-        assertEquals(DateHelper.getTime(tz, 2014, 7, 31, 9, 0, 0), (long)periods.get(20));
-        assertEquals(DateHelper.getTime(tz, 2014, 8, 3, 9, 0, 0), (long)periods.get(21));
-        assertEquals(DateHelper.getTime(tz, 2014, 8, 6, 9, 0, 0), (long)periods.get(22));
-        assertEquals(DateHelper.getTime(tz, 2014, 8, 9, 9, 0, 0), (long)periods.get(23));
-        assertEquals(DateHelper.getTime(tz, 2014, 8, 12, 9, 0, 0), (long)periods.get(24));
-        assertEquals(DateHelper.getTime(tz, 2014, 8, 15, 9, 0, 0), (long)periods.get(25));
-        assertEquals(DateHelper.getTime(tz, 2014, 8, 18, 9, 0, 0), (long)periods.get(26));
-        assertEquals(DateHelper.getTime(tz, 2014, 8, 21, 9, 0, 0), (long)periods.get(27));
-        assertEquals(DateHelper.getTime(tz, 2014, 8, 24, 9, 0, 0), (long)periods.get(28));
-        assertEquals(DateHelper.getTime(tz, 2014, 8, 27, 9, 0, 0), (long)periods.get(29));
-        assertEquals(DateHelper.getTime(tz, 2014, 8, 30, 9, 0, 0), (long)periods.get(30));
-        assertEquals(DateHelper.getTime(tz, 2014, 8, 30, 9, 0, 0), (long)periods.get(30));
+        assertEquals(DateHelper.getTime(2014, 6, 1, 9, 0, 0, tz), (long)periods.get(0));
+        assertEquals(DateHelper.getTime(2014, 6, 4, 9, 0, 0, tz), (long)periods.get(1));
+        assertEquals(DateHelper.getTime(2014, 6, 7, 9, 0, 0, tz), (long)periods.get(2));
+        assertEquals(DateHelper.getTime(2014, 6, 10, 9, 0, 0, tz), (long)periods.get(3));
+        assertEquals(DateHelper.getTime(2014, 6, 13, 9, 0, 0, tz), (long)periods.get(4));
+        assertEquals(DateHelper.getTime(2014, 6, 16, 9, 0, 0, tz), (long)periods.get(5));
+        assertEquals(DateHelper.getTime(2014, 6, 19, 9, 0, 0, tz), (long)periods.get(6));
+        assertEquals(DateHelper.getTime(2014, 6, 22, 9, 0, 0, tz), (long)periods.get(7));
+        assertEquals(DateHelper.getTime(2014, 6, 25, 9, 0, 0, tz), (long)periods.get(8));
+        assertEquals(DateHelper.getTime(2014, 6, 28, 9, 0, 0, tz), (long)periods.get(9));
+        assertEquals(DateHelper.getTime(2014, 7, 1, 9, 0, 0, tz), (long)periods.get(10));
+        assertEquals(DateHelper.getTime(2014, 7, 4, 9, 0, 0, tz), (long)periods.get(11));
+        assertEquals(DateHelper.getTime(2014, 7, 7, 9, 0, 0, tz), (long)periods.get(12));
+        assertEquals(DateHelper.getTime(2014, 7, 10, 9, 0, 0, tz), (long)periods.get(13));
+        assertEquals(DateHelper.getTime(2014, 7, 13, 9, 0, 0, tz), (long)periods.get(14));
+        assertEquals(DateHelper.getTime(2014, 7, 16, 9, 0, 0, tz), (long)periods.get(15));
+        assertEquals(DateHelper.getTime(2014, 7, 19, 9, 0, 0, tz), (long)periods.get(16));
+        assertEquals(DateHelper.getTime(2014, 7, 22, 9, 0, 0, tz), (long)periods.get(17));
+        assertEquals(DateHelper.getTime(2014, 7, 25, 9, 0, 0, tz), (long)periods.get(18));
+        assertEquals(DateHelper.getTime(2014, 7, 28, 9, 0, 0, tz), (long)periods.get(19));
+        assertEquals(DateHelper.getTime(2014, 7, 31, 9, 0, 0, tz), (long)periods.get(20));
+        assertEquals(DateHelper.getTime(2014, 8, 3, 9, 0, 0, tz), (long)periods.get(21));
+        assertEquals(DateHelper.getTime(2014, 8, 6, 9, 0, 0, tz), (long)periods.get(22));
+        assertEquals(DateHelper.getTime(2014, 8, 9, 9, 0, 0, tz), (long)periods.get(23));
+        assertEquals(DateHelper.getTime(2014, 8, 12, 9, 0, 0, tz), (long)periods.get(24));
+        assertEquals(DateHelper.getTime(2014, 8, 15, 9, 0, 0, tz), (long)periods.get(25));
+        assertEquals(DateHelper.getTime(2014, 8, 18, 9, 0, 0, tz), (long)periods.get(26));
+        assertEquals(DateHelper.getTime(2014, 8, 21, 9, 0, 0, tz), (long)periods.get(27));
+        assertEquals(DateHelper.getTime(2014, 8, 24, 9, 0, 0, tz), (long)periods.get(28));
+        assertEquals(DateHelper.getTime(2014, 8, 27, 9, 0, 0, tz), (long)periods.get(29));
+        assertEquals(DateHelper.getTime(2014, 8, 30, 9, 0, 0, tz), (long)periods.get(30));
+        assertEquals(DateHelper.getTime(2014, 8, 30, 9, 0, 0, tz), (long)periods.get(30));
     }
 
     @Test
@@ -292,8 +293,8 @@ public class ICalTaskTest {
     public void testSunOffset() throws Exception {
         PluginContext ctx = PluginContext.createLocal("pluginId");
         MockTaskManager am = new MockTaskManager();
-        TimeZone tz = TimeZone.getTimeZone("America/Denver");
-        VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0)), "task1");
+        DateTimeZone tz = DateTimeZone.forID("America/Denver");
+        VEvent event = new VEvent(new DateTime(DateHelper.getTime(2014, 10, 19, 0, 0, 0, tz)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
         event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         event.getProperties().add(new XProperty(ICalTask.PROP_SUN_OFFSET, "SS+30"));
@@ -304,22 +305,22 @@ public class ICalTaskTest {
         task.setLatitude(39.3722);
         task.setLongitude(-104.8561);
 
-        List<Long> runs = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 10, 19, 23, 59, 59));
+        List<Long> runs = task.getRunsDuringInterval(DateHelper.getTime(2014, 10, 19, 0, 0, 0, tz), DateHelper.getTime(2014, 10, 19, 23, 59, 59, tz), tz);
         assertEquals(1, runs.size());
         assertEquals(1413765900000l, (long)runs.get(0));
 
-        runs = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 12, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 12, 19, 23, 59, 59));
+        runs = task.getRunsDuringInterval(DateHelper.getTime(2014, 12, 19, 0, 0, 0, tz), DateHelper.getTime(2014, 12, 19, 23, 59, 59, tz), tz);
         assertEquals(1, runs.size());
         assertEquals(1419034080000l, (long) runs.get(0));
 
-        runs = task.getRunsDuringInterval(DateHelper.getTime(tz, 2015, 7, 19, 0, 0, 0), DateHelper.getTime(tz, 2015, 7, 19, 23, 59, 59));
+        runs = task.getRunsDuringInterval(DateHelper.getTime(2015, 7, 19, 0, 0, 0, tz), DateHelper.getTime(2015, 7, 19, 23, 59, 59, tz), tz);
         assertEquals(1, runs.size());
         assertEquals(1437360780000l, (long)runs.get(0));
 
         // This one is interesting -- since we store the start time for events with a sun offset as midnight, this event
         // technically would have already run as it's strictly defined by the VEvent. However, with the sun offset the
         // start time is pushed until after the current time and it SHOULD run
-        runs = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 20, 16, 46, 0), DateHelper.getTime(tz, 2014, 10, 20, 23, 59, 59));
+        runs = task.getRunsDuringInterval(DateHelper.getTime(2014, 10, 20, 16, 46, 0, tz), DateHelper.getTime(2014, 10, 20, 23, 59, 59, tz), tz);
         assertEquals(1, runs.size());
     }
 
@@ -327,8 +328,8 @@ public class ICalTaskTest {
     public void testGetRunsForIntervalWithNoLatLong() throws Exception {
         PluginContext ctx = PluginContext.createLocal("pluginId");
         MockTaskManager am = new MockTaskManager();
-        TimeZone tz = TimeZone.getTimeZone("America/Denver");
-        VEvent event = new VEvent(new DateTime(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0)), "task1");
+        DateTimeZone tz = DateTimeZone.forID("America/Denver");
+        VEvent event = new VEvent(new DateTime(DateHelper.getTime(2014, 10, 19, 0, 0, 0, tz)), "task1");
         event.getProperties().add(new UidGenerator("1").generateUid());
         event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
         event.getProperties().add(new XProperty(ICalTask.PROP_SUN_OFFSET, "SS+30"));
@@ -339,7 +340,7 @@ public class ICalTaskTest {
 
         List<Long> runs = null;
         try {
-            runs = task.getRunsDuringInterval(DateHelper.getTime(tz, 2014, 10, 19, 0, 0, 0), DateHelper.getTime(tz, 2014, 10, 19, 23, 59, 59));
+            runs = task.getRunsDuringInterval(DateHelper.getTime(2014, 10, 19, 0, 0, 0, tz), DateHelper.getTime(2014, 10, 19, 23, 59, 59, tz), tz);
             fail("Should have thrown exception");
         } catch (SchedulingException ignored) {}
     }

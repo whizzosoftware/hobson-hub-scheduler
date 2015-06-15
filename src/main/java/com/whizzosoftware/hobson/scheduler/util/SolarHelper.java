@@ -10,12 +10,15 @@ package com.whizzosoftware.hobson.scheduler.util;
 import com.luckycatlabs.sunrisesunset.SunriseSunsetCalculator;
 import com.luckycatlabs.sunrisesunset.dto.Location;
 import com.whizzosoftware.hobson.scheduler.ical.SolarOffset;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.LocalDate;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 
-import java.text.DateFormat;
 import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Calendar;
-import java.util.TimeZone;
+import java.util.Locale;
 
 /**
  * A start date/time relative to sunrise or sunset.
@@ -23,9 +26,9 @@ import java.util.TimeZone;
  * @author Dan Noguerol
  */
 public class SolarHelper {
-    public static String createDateString(Calendar c, SolarOffset offset, double latitude, double longitude) throws ParseException {
-        DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'Z");
-        return dateFormat.format(createCalendar(c, offset, latitude, longitude).getTime());
+    public static String createDateString(LocalDate c, DateTimeZone tz, SolarOffset offset, double latitude, double longitude) throws ParseException {
+        DateTimeFormatter dateFormat = DateTimeFormat.forPattern("yyyyMMdd'T'HHmmss'Z'Z");
+        return dateFormat.print(createCalendar(c, tz, offset, latitude, longitude));
     }
 
     /**
@@ -37,9 +40,10 @@ public class SolarHelper {
      *
      * @return a SunriseSunsetCalendar instance
      */
-    public static SunriseSunsetCalendar getSunriseSunsetCalendar(Calendar today, double latitude, double longitude) {
-        SunriseSunsetCalculator calc = new SunriseSunsetCalculator(new Location(latitude, longitude), today.getTimeZone());
-        return new SunriseSunsetCalendar(calc.getOfficialSunriseCalendarForDate(today), calc.getOfficialSunsetCalendarForDate(today));
+    public static SunriseSunsetCalendar getSunriseSunsetCalendar(LocalDate today, DateTimeZone tz, double latitude, double longitude) {
+        SunriseSunsetCalculator calc = new SunriseSunsetCalculator(new Location(latitude, longitude), tz.toTimeZone());
+        Calendar c = today.toDateTimeAtStartOfDay(tz).toCalendar(Locale.ENGLISH);
+        return new SunriseSunsetCalendar(new DateTime(calc.getOfficialSunriseCalendarForDate(c)), new DateTime(calc.getOfficialSunsetCalendarForDate(c)));
     }
 
     /**
@@ -56,11 +60,11 @@ public class SolarHelper {
      *
      * @throws ParseException on failure
      */
-    public static Calendar createCalendar(Calendar startDateTime, SolarOffset offset, double latitude, double longitude) throws ParseException {
-        Calendar newCal;
+    public static DateTime createCalendar(LocalDate startDateTime, DateTimeZone tz, SolarOffset offset, double latitude, double longitude) throws ParseException {
+        DateTime newCal;
 
         // perform the sunrise or sunset calculation
-        SunriseSunsetCalendar ssc = getSunriseSunsetCalendar(startDateTime, latitude, longitude);
+        SunriseSunsetCalendar ssc = getSunriseSunsetCalendar(startDateTime, tz, latitude, longitude);
         if (offset.getType() == SolarOffset.Type.SUNSET) {
             newCal = ssc.getSunset();
         } else {
@@ -68,23 +72,21 @@ public class SolarHelper {
         }
 
         // add the offset
-        newCal.add(Calendar.MINUTE, offset.getOffset());
+        newCal = newCal.plusMinutes(offset.getOffset());
 
         // create and return a DtStart object with the offset time
         return newCal;
     }
 
-    public static String[] getSunriseSunset(Double latitude, Double longitude, long now) {
+    public static String[] getSunriseSunset(Double latitude, Double longitude, DateTimeZone tz, long now) {
         if (latitude != null && longitude != null) {
-            Calendar c = Calendar.getInstance();
-            c.setTimeInMillis(now);
+            DateTime c = new DateTime(now, tz);
 
-            SolarHelper.SunriseSunsetCalendar ssc = SolarHelper.getSunriseSunsetCalendar(c, latitude, longitude);
-            DateFormat df = new SimpleDateFormat("HH:mmX");
-            df.setTimeZone(TimeZone.getDefault());
+            SolarHelper.SunriseSunsetCalendar ssc = SolarHelper.getSunriseSunsetCalendar(c.toLocalDate(), tz, latitude, longitude);
+            DateTimeFormatter df = DateTimeFormat.forPattern("HH:mmZ");
 
-            String sunrise = df.format(ssc.getSunrise().getTime());
-            String sunset = df.format(ssc.getSunset().getTime());
+            String sunrise = df.print(ssc.getSunrise());
+            String sunset = df.print(ssc.getSunset());
             return new String[]{sunrise, sunset};
         } else {
             return null;
@@ -92,19 +94,19 @@ public class SolarHelper {
     }
 
     public static class SunriseSunsetCalendar {
-        private Calendar sunrise;
-        private Calendar sunset;
+        private DateTime sunrise;
+        private DateTime sunset;
 
-        public SunriseSunsetCalendar(Calendar sunrise, Calendar sunset) {
+        public SunriseSunsetCalendar(DateTime sunrise, DateTime sunset) {
             this.sunrise = sunrise;
             this.sunset = sunset;
         }
 
-        public Calendar getSunrise() {
+        public DateTime getSunrise() {
             return sunrise;
         }
 
-        public Calendar getSunset() {
+        public DateTime getSunset() {
             return sunset;
         }
     }

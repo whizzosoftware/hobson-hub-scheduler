@@ -18,16 +18,17 @@ import com.whizzosoftware.hobson.api.task.TaskManager;
 import com.whizzosoftware.hobson.scheduler.SchedulerPlugin;
 import com.whizzosoftware.hobson.scheduler.TaskExecutionListener;
 import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
-import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.model.*;
 import net.fortuna.ical4j.model.component.VEvent;
 import net.fortuna.ical4j.model.property.*;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.joda.time.format.DateTimeFormat;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.ParseException;
 import java.util.*;
-import java.util.Calendar;
 
 /**
  * An implementation of HobsonTask for iCal scheduled events.
@@ -101,10 +102,9 @@ public class ICalTask extends HobsonTask implements Runnable {
         String recurrence = null;
 
         if (event.getStartDate() != null) {
-            String dtStart = event.getStartDate().getValue();
-            int ix = dtStart.indexOf('T');
-            date = dtStart.substring(0, ix);
-            time = dtStart.substring(ix + 1);
+            DateTime dt = new DateTime(event.getStartDate().getDate()).toDateTime(DateTimeZone.forID("GMT"));
+            date = DateTimeFormat.forPattern("YYYYMMdd").print(dt);
+            time = DateTimeFormat.forPattern("HHmmss'Z'").print(dt);
             Property p = event.getProperty(PROP_SUN_OFFSET);
             if (p != null) {
                 time = p.getValue();
@@ -208,7 +208,7 @@ public class ICalTask extends HobsonTask implements Runnable {
         return event;
     }
 
-    public List<Long> getRunsDuringInterval(long startTime, long endTime) throws SchedulingException {
+    public List<Long> getRunsDuringInterval(long startTime, long endTime, DateTimeZone tz) throws SchedulingException {
         List<Long> results = new ArrayList<>();
         if (event != null) {
             // if there's a solar offset, reset the start time to the beginning of the day so that
@@ -217,24 +217,21 @@ public class ICalTask extends HobsonTask implements Runnable {
                 if (latitude == null || longitude == null) {
                     throw new SchedulingException("Unable to calculate sunrise/sunset; please set Hub latitude/longitude");
                 }
-                Calendar c = Calendar.getInstance();
-                c.setTimeInMillis(startTime);
-                DateHelper.resetToBeginningOfDay(c);
-                startTime = c.getTimeInMillis();
+                DateTime c = new DateTime(startTime, tz);
+                startTime = c.withTimeAtStartOfDay().getMillis();
             }
 
-            PeriodList periods = event.calculateRecurrenceSet(new Period(new DateTime(startTime), new DateTime(endTime)));
+            PeriodList periods = event.calculateRecurrenceSet(new Period(new net.fortuna.ical4j.model.DateTime(startTime), new net.fortuna.ical4j.model.DateTime(endTime)));
             for (Object period : periods) {
                 // get the recurrence time
                 long time = ((Period)period).getStart().getTime();
 
                 // adjust time if there's an solar offset defined
                 if (solarOffset != null) {
-                        Calendar c = Calendar.getInstance();
-                        c.setTimeInMillis(time);
+                    DateTime c = new DateTime(time, tz);
                     try {
-                        c = SolarHelper.createCalendar(c, solarOffset, latitude, longitude);
-                        time = c.getTimeInMillis();
+                        c = SolarHelper.createCalendar(c.toLocalDate(), tz, solarOffset, latitude, longitude);
+                        time = c.getMillis();
                     } catch (ParseException e) {
                         throw new SchedulingException("Error parsing solar offset", e);
                     }

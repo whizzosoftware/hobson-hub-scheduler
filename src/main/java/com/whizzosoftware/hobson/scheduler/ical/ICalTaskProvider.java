@@ -30,12 +30,12 @@ import net.fortuna.ical4j.model.property.CalScale;
 import net.fortuna.ical4j.model.property.ProdId;
 import net.fortuna.ical4j.model.property.Uid;
 import net.fortuna.ical4j.model.property.Version;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.*;
-import java.util.TimeZone;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -58,14 +58,14 @@ public class ICalTaskProvider implements TaskProvider, TaskExecutionListener {
     private ScheduledThreadPoolExecutor resetDayExecutor;
     private Double latitude;
     private Double longitude;
-    private TimeZone timeZone;
+    private DateTimeZone timeZone;
     private boolean running = false;
 
     public ICalTaskProvider(PluginContext ctx, Double latitude, Double longitude) {
-        this(ctx, latitude, longitude, TimeZone.getDefault());
+        this(ctx, latitude, longitude, DateTimeZone.getDefault());
     }
 
-    public ICalTaskProvider(PluginContext ctx, Double latitude, Double longitude, TimeZone timeZone) {
+    public ICalTaskProvider(PluginContext ctx, Double latitude, Double longitude, DateTimeZone timeZone) {
         this.ctx = ctx;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -131,21 +131,21 @@ public class ICalTaskProvider implements TaskProvider, TaskExecutionListener {
      * @throws Exception on failure
      */
     protected boolean scheduleNextRun(ICalTask task, long now, boolean wasDayReset) throws Exception {
-        long startOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 0, 0, 0, 0).getTimeInMillis();
-        long endOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
+        long startOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 0, 0, 0, 0).getMillis();
+        long endOfToday = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getMillis();
         boolean shouldRunToday = false;
 
         task.setProperty(ICalTask.PROP_SCHEDULED, false);
 
         try {
             // check if there is more than 1 run in the next two days
-            List<Long> todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 86400000l);
+            List<Long> todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 86400000l, timeZone);
             // if not, check if there is more than 1 run in the next 6 weeks
             if (todaysRunTimes.size() < 2) {
-                todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 3628800000l);
+                todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 3628800000l, timeZone);
                 // it not, check if there is more than 1 run in the next 53 weeks
                 if (todaysRunTimes.size() < 2) {
-                    todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 32054400000l);
+                    todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 32054400000l, timeZone);
                 }
             }
 
@@ -272,7 +272,7 @@ public class ICalTaskProvider implements TaskProvider, TaskExecutionListener {
         if (running || forceCheck) {
             // check if the task needs to execute again today
             try {
-                long endOfDay = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getTimeInMillis();
+                long endOfDay = DateHelper.getTimeInCurrentDay(now, timeZone, 23, 59, 59, 999).getMillis();
                 logger.debug("Task is done executing; checking for any more runs between {} and {}", now, endOfDay);
                 scheduleNextRun(task, now, false);
             } catch (Exception e) {

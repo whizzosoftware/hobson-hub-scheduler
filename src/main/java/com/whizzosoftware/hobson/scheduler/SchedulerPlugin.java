@@ -24,6 +24,7 @@ import com.whizzosoftware.hobson.api.variable.VariableUpdate;
 import com.whizzosoftware.hobson.scheduler.executor.ThreadPoolScheduledTaskExecutor;
 import com.whizzosoftware.hobson.scheduler.ical.ICalTaskProvider;
 import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
+import org.joda.time.DateTimeZone;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -73,7 +74,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
         // set the initial sunrise and sunset
         String sunrise = null;
         String sunset = null;
-        String ss[] = SolarHelper.getSunriseSunset(latitude, longitude, System.currentTimeMillis());
+        String ss[] = SolarHelper.getSunriseSunset(latitude, longitude, DateTimeZone.getDefault(), System.currentTimeMillis());
         if (ss != null) {
             sunrise = ss[0];
             sunset = ss[1];
@@ -84,7 +85,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
         publishGlobalVariable(SUNSET, sunset, HobsonVariable.Mask.READ_ONLY);
 
         // set the plugin to running status
-        setStatus(new PluginStatus(PluginStatus.Status.RUNNING));
+        setStatus(new PluginStatus(PluginStatus.Code.RUNNING));
     }
 
     @Override
@@ -154,7 +155,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
 
     private void updateSunriseSunset(long now) {
         if (latitude != null && longitude != null) {
-            String[] ss = SolarHelper.getSunriseSunset(latitude, longitude, now);
+            String[] ss = SolarHelper.getSunriseSunset(latitude, longitude, DateTimeZone.forID("America/Denver"), now);
             String sunrise = ss[0];
             String sunset = ss[1];
             logger.debug("Sunrise: {}, sunset: {}", sunrise, sunset);
