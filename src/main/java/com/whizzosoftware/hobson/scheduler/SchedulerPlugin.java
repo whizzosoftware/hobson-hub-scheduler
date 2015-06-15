@@ -104,11 +104,6 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     }
 
     @Override
-    public String[] getEventTopics() {
-        return new String[] {EventTopics.CONFIG_TOPIC};
-    }
-
-    @Override
     public void onPluginConfigurationUpdate(PropertyContainer config) {
     }
 

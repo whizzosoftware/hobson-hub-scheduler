@@ -257,8 +257,8 @@ public class ICalTaskProvider implements TaskProvider, TaskExecutionListener {
     }
 
     @Override
-    public void onTaskExecuted(ICalTask task, long now) {
-        onTaskExecuted(task, now, false);
+    public void onTaskExecuted(ICalTask task, long now, Throwable error) {
+        onTaskExecuted(task, now, error, false);
     }
 
     /**
@@ -268,7 +268,10 @@ public class ICalTaskProvider implements TaskProvider, TaskExecutionListener {
      * @param now the current time
      * @param forceCheck post-process regardless of running state?
      */
-    protected void onTaskExecuted(ICalTask task, long now, boolean forceCheck) {
+    protected void onTaskExecuted(ICalTask task, long now, Throwable error, boolean forceCheck) {
+        // notify task manager that the task has executed
+        taskManager.fireTaskExecutionEvent(task, now, error);
+
         if (running || forceCheck) {
             // check if the task needs to execute again today
             try {

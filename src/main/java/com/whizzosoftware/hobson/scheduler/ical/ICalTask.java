@@ -183,16 +183,19 @@ public class ICalTask extends HobsonTask implements Runnable {
     protected void run(long now) {
         logger.info("Task \"{}\" is executing", getName());
 
+        Throwable error = null;
+
         // execute the actions but catch any exception or the task will never execute again
         try {
             executeActions(getActionSet());
         } catch (Throwable e) {
+            error = e;
             logger.error("Error executing task " + getName(), e);
         }
 
         // notify the listener that the task has executed (whether successfully or unsuccessfully)
         if (listener != null) {
-            listener.onTaskExecuted(this, now);
+            listener.onTaskExecuted(this, now, error);
         }
     }
 

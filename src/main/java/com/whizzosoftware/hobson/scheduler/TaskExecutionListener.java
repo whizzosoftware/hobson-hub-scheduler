@@ -10,5 +10,5 @@ package com.whizzosoftware.hobson.scheduler;
 import com.whizzosoftware.hobson.scheduler.ical.ICalTask;
 
 public interface TaskExecutionListener {
-    public void onTaskExecuted(ICalTask task, long now);
+    public void onTaskExecuted(ICalTask task, long now, Throwable error);
 }
