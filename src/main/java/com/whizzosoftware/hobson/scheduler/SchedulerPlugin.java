@@ -94,6 +94,11 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
         super.onShutdown();
     }
 
+    @Override
+    protected TypedProperty[] createSupportedProperties() {
+        return null;
+    }
+
     public TaskProvider getTaskProvider() {
         return taskProvider;
     }
