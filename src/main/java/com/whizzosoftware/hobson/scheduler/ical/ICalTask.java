@@ -162,7 +162,7 @@ public class ICalTask extends HobsonTask implements Runnable {
                 }
                 if (triggerCondition.hasPropertyValue("recurrence")) {
                     String r = (String)triggerCondition.getPropertyValue("recurrence");
-                    if (r.length() > 0) {
+                    if (r.length() > 0 && !"never".equalsIgnoreCase(r)) {
                         event.getProperties().add(new RRule(r));
                     }
                 }

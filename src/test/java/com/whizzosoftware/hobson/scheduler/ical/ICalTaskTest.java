@@ -235,6 +235,60 @@ public class ICalTaskTest {
     }
 
     @Test
+    public void testJSONRuleConstructionWithNeverRecurrence() throws Exception {
+        ICalTaskProvider provider = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
+        provider.setScheduleExecutor(new MockScheduledTaskExecutor());
+
+        // validate we start with a non-existent temp file
+        File calendarFile = File.createTempFile("schedule", ".ics");
+        assertTrue(calendarFile.delete());
+        assertFalse(calendarFile.exists());
+
+        try {
+            provider.setScheduleFile(calendarFile);
+            provider.reloadScheduleFile();
+
+            Map<String,Object> props = new HashMap<>();
+            props.put("date", "2014-07-01");
+            props.put("time", "10:00:00Z");
+            props.put("recurrence", "never");
+            provider.onCreateTask(
+                    "My Task",
+                    null, new PropertyContainerSet(
+                            new PropertyContainer(
+                                    PropertyContainerClassContext.create(PluginContext.createLocal("pluginId"), "foo"),
+                                    props
+                            )
+                    ),
+                    new PropertyContainerSet(
+                            "foo",
+                            null
+                    )
+            );
+
+            // make sure the provider updated the rule file
+            assertTrue(calendarFile.exists());
+            Calendar cal = new CalendarBuilder().build(new FileReader(calendarFile));
+
+            assertEquals(2, cal.getComponents().size());
+            assertTrue(cal.getComponents().get(0) instanceof VJournal);
+            assertTrue(cal.getComponents().get(1) instanceof VEvent);
+
+            VEvent event = (VEvent)cal.getComponents().get(1);
+            assertNotNull(event.getUid().getValue());
+            assertEquals("My Task", event.getSummary().getValue());
+
+            assertEquals("20140701T100000Z", event.getProperties().getProperty("DTSTART").getValue());
+            assertNull(event.getProperties().getProperty("RRULE"));
+
+            assertNotNull(event.getProperties().getProperty(ICalTask.PROP_ACTION_SET));
+            assertEquals("foo", event.getProperties().getProperty(ICalTask.PROP_ACTION_SET).getValue());
+        } finally {
+            assertTrue(calendarFile.delete());
+        }
+    }
+
+    @Test
     public void testJSONRuleConstructionWithSunOffset() throws Exception {
         ICalTaskProvider provider = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
         provider.setScheduleExecutor(new MockScheduledTaskExecutor());
