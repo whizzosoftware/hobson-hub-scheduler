@@ -15,12 +15,12 @@ import com.whizzosoftware.hobson.api.plugin.AbstractHobsonPlugin;
 import com.whizzosoftware.hobson.api.plugin.PluginStatus;
 import com.whizzosoftware.hobson.api.plugin.PluginType;
 import com.whizzosoftware.hobson.api.property.PropertyContainer;
-import com.whizzosoftware.hobson.api.property.PropertyContainerClassContext;
 import com.whizzosoftware.hobson.api.property.TypedProperty;
 import com.whizzosoftware.hobson.api.task.TaskProvider;
 import com.whizzosoftware.hobson.api.variable.HobsonVariable;
 import com.whizzosoftware.hobson.api.variable.VariableUpdate;
-import com.whizzosoftware.hobson.scheduler.executor.ThreadPoolScheduledTaskExecutor;
+import com.whizzosoftware.hobson.scheduler.condition.ScheduleConditionClass;
+import com.whizzosoftware.hobson.scheduler.queue.LocalTaskQueue;
 import com.whizzosoftware.hobson.scheduler.ical.ICalTaskProvider;
 import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
 import org.joda.time.DateTimeZone;
@@ -36,8 +36,6 @@ import java.util.*;
  */
 public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetListener {
     private static final Logger logger = LoggerFactory.getLogger(SchedulerPlugin.class);
-
-    public static final String SCHEDULE_CONDITION_CLASS_ID = "schedule";
 
     private static final String SUNRISE = "sunrise";
     private static final String SUNSET = "sunset";
@@ -58,17 +56,13 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
 
         // create an ical task provider
         taskProvider = new ICalTaskProvider(getContext(), latitude, longitude);
-        taskProvider.setScheduleExecutor(new ThreadPoolScheduledTaskExecutor());
-        taskProvider.setScheduleFile(getDataFile("schedule.ics"));
+        taskProvider.setScheduleExecutor(new LocalTaskQueue(getTaskManager()));
         taskProvider.setTaskManager(getTaskManager());
+        taskProvider.setDayResetListener(this);
         taskProvider.start();
 
         // publish conditions that this plugin can trigger
-        List<TypedProperty> props = new ArrayList<>();
-        props.add(new TypedProperty("date", "Start date", "The date the task will first occur", TypedProperty.Type.DATE));
-        props.add(new TypedProperty("time", "Start time", "The time of day the task will occur", TypedProperty.Type.TIME));
-        props.add(new TypedProperty("recurrence", "Repeat", "How often the task should repeat", TypedProperty.Type.RECURRENCE));
-        publishConditionClass(PropertyContainerClassContext.create(getContext(), SCHEDULE_CONDITION_CLASS_ID), "A scheduled time occurs", props);
+        publishConditionClass(new ScheduleConditionClass(getContext()));
 
         // set the initial sunrise and sunset
         String sunrise = null;
@@ -90,7 +84,6 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     @Override
     public void onShutdown() {
         taskProvider.stop();
-        super.onShutdown();
     }
 
     @Override
@@ -144,7 +137,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
 
     private void updateLatitudeLongitude(Double latitude, Double longitude) {
         if (this.latitude == null || !this.latitude.equals(latitude) || this.longitude == null || !this.longitude.equals(longitude)) {
-            logger.debug("Latitude and logitude have changed");
+            logger.debug("Latitude and longitude have changed");
             this.latitude = latitude;
             this.longitude = longitude;
             taskProvider.setLatitudeLongitude(latitude, longitude);

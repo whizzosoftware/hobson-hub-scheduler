@@ -5,15 +5,16 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  *******************************************************************************/
-package com.whizzosoftware.hobson.scheduler.executor;
+package com.whizzosoftware.hobson.scheduler.queue;
 
-import com.whizzosoftware.hobson.scheduler.ical.ICalTask;
+import com.whizzosoftware.hobson.api.task.TaskContext;
+import com.whizzosoftware.hobson.scheduler.TaskNotFoundException;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class MockScheduledTaskExecutor implements ScheduledTaskExecutor {
-    private Map<ICalTask,Long> delayMap = new HashMap<>();
+public class MockTaskQueue implements TaskQueue {
+    private Map<TaskContext,Long> delayMap = new HashMap<>();
 
     @Override
     public void start() {
@@ -24,18 +25,18 @@ public class MockScheduledTaskExecutor implements ScheduledTaskExecutor {
     }
 
     @Override
-    public void schedule(ICalTask task, long delayInMs) {
-        delayMap.put(task, delayInMs);
+    public void schedule(TaskContext taskContext, long delayInMs) {
+        delayMap.put(taskContext, delayInMs);
     }
 
     @Override
-    public boolean isTaskScheduled(ICalTask task) {
-        return delayMap.containsKey(task);
+    public boolean isTaskScheduled(TaskContext context) {
+        return delayMap.containsKey(context);
     }
 
     @Override
-    public void cancel(ICalTask task) throws TaskNotFoundException {
-        delayMap.remove(task);
+    public void cancel(TaskContext context) throws TaskNotFoundException {
+        delayMap.remove(context);
     }
 
     @Override
@@ -43,8 +44,8 @@ public class MockScheduledTaskExecutor implements ScheduledTaskExecutor {
         delayMap.clear();
     }
 
-    public Long getDelayForTask(ICalTask task) {
-        return delayMap.get(task);
+    public Long getDelayForTask(TaskContext context) {
+        return delayMap.get(context);
     }
 
     public boolean hasDelays() {

@@ -9,36 +9,6 @@
     <description>Provides the ability to create scheduled-based tasks.</description>
     <dependencies>
         <dependency>
-            <groupId>org.apache.felix</groupId>
-            <artifactId>org.osgi.core</artifactId>
-            <version>1.4.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.felix</groupId>
-            <artifactId>org.osgi.compendium</artifactId>
-            <version>1.4.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.felix</groupId>
-            <artifactId>org.apache.felix.dependencymanager</artifactId>
-            <version>3.1.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.felix</groupId>
-            <artifactId>org.apache.felix.gogo.runtime</artifactId>
-            <version>0.10.0</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.felix</groupId>
-            <artifactId>org.apache.felix.webconsole</artifactId>
-            <version>4.2.2</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>1.7.6</version>
@@ -75,7 +45,7 @@
         <dependency>
             <groupId>org.mnode.ical4j</groupId>
             <artifactId>ical4j</artifactId>
-            <version>1.0.5.2</version>
+            <version>1.0.6</version>
         </dependency>
         <dependency>
             <groupId>backport-util-concurrent</groupId>
@@ -97,6 +67,12 @@
             <groupId>com.whizzosoftware.hobson.hub</groupId>
             <artifactId>hobson-hub-api-mock</artifactId>
             <version>0.5.0-SNAPSHOT</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>3.1</version>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -125,7 +101,7 @@
                 <extensions>true</extensions>
                 <configuration>
                     <instructions>
-                        <Import-Package>org.osgi.framework,org.osgi.service.event,org.apache.felix.dm.*,org.slf4j,org.apache.commons.logging,org.json.*,org.joda.time.*,com.whizzosoftware.hobson.api.*;version="[0.5.0,0.6)</Import-Package>
+                        <Import-Package>org.osgi.framework,org.osgi.service.event,org.apache.felix.dm.*,org.slf4j,org.apache.commons.logging,org.json.*,org.joda.time.*,org.apache.commons.lang3.*,com.whizzosoftware.hobson.api.*;version="[0.5.0,0.6)</Import-Package>
                         <Bundle-Activator>com.whizzosoftware.hobson.api.osgi.activator.HobsonBundleActivator</Bundle-Activator>
                         <Embed-Dependency>ical4j;scope=compile|runtime,backport-util-concurrent;scope=compile|runtime,org.apache.servicemix.bundles.commons-beanutils;scope=compile|runtime,org.apache.servicemix.bundles.commons-lang;scope=compile|runtime,SunriseSunsetCalculator;scope=compile|runtime</Embed-Dependency>
                         <Provide-Capability>hobson.plugin=com.whizzosoftware.hobson.scheduler.SchedulerPlugin</Provide-Capability>

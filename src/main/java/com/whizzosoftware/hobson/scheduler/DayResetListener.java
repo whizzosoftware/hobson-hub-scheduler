@@ -13,5 +13,5 @@ package com.whizzosoftware.hobson.scheduler;
  * @author Dan Noguerol
  */
 public interface DayResetListener {
-    public void onDayReset(long now);
+    void onDayReset(long now);
 }

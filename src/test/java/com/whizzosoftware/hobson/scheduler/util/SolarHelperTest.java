@@ -5,8 +5,9 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  *******************************************************************************/
-package com.whizzosoftware.hobson.scheduler.ical;
+package com.whizzosoftware.hobson.scheduler.util;
 
+import com.whizzosoftware.hobson.scheduler.SolarOffset;
 import com.whizzosoftware.hobson.scheduler.util.SolarHelper;
 import org.joda.time.DateTimeZone;
 import org.joda.time.LocalDate;

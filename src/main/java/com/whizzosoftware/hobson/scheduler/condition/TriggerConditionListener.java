@@ -5,10 +5,10 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  *******************************************************************************/
-package com.whizzosoftware.hobson.scheduler;
+package com.whizzosoftware.hobson.scheduler.condition;
 
 import com.whizzosoftware.hobson.scheduler.ical.ICalTask;
 
-public interface TaskExecutionListener {
-    public void onTaskExecuted(ICalTask task, long now, Throwable error);
+public interface TriggerConditionListener {
+    public void onTriggerCondition(ICalTask task, long now);
 }

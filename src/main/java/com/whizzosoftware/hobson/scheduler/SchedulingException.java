@@ -5,7 +5,7 @@
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
  *******************************************************************************/
-package com.whizzosoftware.hobson.scheduler.ical;
+package com.whizzosoftware.hobson.scheduler;
 
 /**
  * Exception thrown when an error occurs when attempting to schedule a task.

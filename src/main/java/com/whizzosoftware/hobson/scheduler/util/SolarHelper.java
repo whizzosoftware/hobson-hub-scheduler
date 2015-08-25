@@ -9,7 +9,7 @@ package com.whizzosoftware.hobson.scheduler.util;
 
 import com.luckycatlabs.sunrisesunset.SunriseSunsetCalculator;
 import com.luckycatlabs.sunrisesunset.dto.Location;
-import com.whizzosoftware.hobson.scheduler.ical.SolarOffset;
+import com.whizzosoftware.hobson.scheduler.SolarOffset;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.LocalDate;

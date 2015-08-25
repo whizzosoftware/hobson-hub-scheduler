@@ -7,19 +7,25 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler.ical;
 
+import com.whizzosoftware.hobson.api.hub.HubContext;
 import com.whizzosoftware.hobson.api.plugin.PluginContext;
 import com.whizzosoftware.hobson.api.property.PropertyContainer;
 import com.whizzosoftware.hobson.api.property.PropertyContainerClassContext;
 import com.whizzosoftware.hobson.api.property.PropertyContainerSet;
+import com.whizzosoftware.hobson.api.property.TypedProperty;
+import com.whizzosoftware.hobson.api.task.HobsonTask;
 import com.whizzosoftware.hobson.api.task.MockTaskManager;
-import com.whizzosoftware.hobson.scheduler.executor.MockScheduledTaskExecutor;
+import com.whizzosoftware.hobson.api.task.TaskContext;
+import com.whizzosoftware.hobson.api.task.condition.ConditionClassType;
+import com.whizzosoftware.hobson.api.task.condition.ConditionEvaluationContext;
+import com.whizzosoftware.hobson.api.task.condition.TaskConditionClass;
+import com.whizzosoftware.hobson.scheduler.SchedulingException;
+import com.whizzosoftware.hobson.scheduler.queue.MockTaskQueue;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
-import net.fortuna.ical4j.data.CalendarBuilder;
 import net.fortuna.ical4j.model.Calendar;
 import net.fortuna.ical4j.model.DateTime;
 import net.fortuna.ical4j.model.Recur;
 import net.fortuna.ical4j.model.component.VEvent;
-import net.fortuna.ical4j.model.component.VJournal;
 import net.fortuna.ical4j.model.property.Comment;
 import net.fortuna.ical4j.model.property.RRule;
 import net.fortuna.ical4j.model.property.Uid;
@@ -28,77 +34,19 @@ import net.fortuna.ical4j.util.UidGenerator;
 import org.joda.time.DateTimeZone;
 import org.junit.Test;
 
-import java.io.File;
-import java.io.FileReader;
 import java.util.*;
 
 import static org.junit.Assert.*;
 
 public class ICalTaskTest {
     @Test
-    public void testConstructorWithNoActionSetId() throws Exception {
-        PluginContext ctx = PluginContext.createLocal("pluginId");
-        VEvent event = new VEvent(new DateTime(), "task1");
-        event.getProperties().add(new Uid("uid"));
-        try {
-            new ICalTask(null, ctx, event, null);
-            fail("Should have thrown exception");
-        } catch (InvalidVEventException ignored) {
-        }
-    }
-
-    @Test
     public void testConstructorWithActions() throws Exception {
         PluginContext ctx = PluginContext.createLocal("pluginId");
         VEvent event = new VEvent(new DateTime(), "task2");
         event.getProperties().add(new Uid("uid2"));
         event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
-        ICalTask task = new ICalTask(null, ctx, event, null);
+        ICalTask task = new ICalTask(ctx, event, null);
         assertEquals("uid2", task.getContext().getTaskId());
-        assertEquals("task2", task.getName());
-        assertEquals("foo", task.getActionSet().getId());
-    }
-
-    @Test
-    public void testGetConditions() throws Exception {
-        PluginContext ctx = PluginContext.createLocal("pluginId");
-        DateTimeZone tz = DateTimeZone.forID("GMT");
-        long time = DateHelper.getTime(2001, 4, 13, 0, 0, 0, tz);
-        VEvent event = new VEvent(new DateTime(time), "task1");
-        event.getProperties().add(new UidGenerator("1").generateUid());
-        event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
-        Recur recur = new Recur("FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13");
-        event.getProperties().add(new RRule(recur));
-
-        ICalTask task = new ICalTask(null, ctx, event, null);
-
-        assertTrue(task.getConditionSet().hasPrimaryProperty());
-        Map<String,Object> map = task.getConditionSet().getPrimaryProperty().getPropertyValues();
-        assertEquals(3, map.size());
-        assertEquals("20010413", map.get("date"));
-        assertEquals("000000Z", map.get("time"));
-        assertEquals("FREQ=MONTHLY;BYMONTHDAY=13;BYDAY=FR", map.get("recurrence"));
-    }
-
-    @Test
-    public void testGetConditionsWithSunOffset() throws Exception {
-        PluginContext ctx = PluginContext.createLocal("pluginId");
-        DateTimeZone tz = DateTimeZone.forID("GMT");
-        VEvent event = new VEvent(new DateTime(DateHelper.getTime(2001, 4, 13, 0, 0, 0, tz)), "task1");
-        event.getProperties().add(new UidGenerator("1").generateUid());
-        event.getProperties().add(new XProperty(ICalTask.PROP_ACTION_SET, "foo"));
-        Recur recur = new Recur("FREQ=MONTHLY;BYDAY=FR;BYMONTHDAY=13");
-        event.getProperties().add(new RRule(recur));
-        event.getProperties().add(new XProperty(ICalTask.PROP_SUN_OFFSET, "SS"));
-
-        ICalTask task = new ICalTask(null, ctx, event, null);
-
-        assertTrue(task.getConditionSet().hasPrimaryProperty());
-        Map<String,Object> map = task.getConditionSet().getPrimaryProperty().getPropertyValues();
-        assertEquals(3, map.size());
-        assertEquals("20010413", map.get("date"));
-        assertEquals("FREQ=MONTHLY;BYMONTHDAY=13;BYDAY=FR", map.get("recurrence"));
-        assertEquals("SS", map.get("time"));
     }
 
     @Test
@@ -115,7 +63,7 @@ public class ICalTaskTest {
         event.getProperties().add(new RRule(recur));
 
         // check from day before first occurrence
-        ICalTask task = new ICalTask(null, ctx, event, null);
+        ICalTask task = new ICalTask(ctx, event, null);
         List<Long> periods = task.getRunsDuringInterval(DateHelper.getTime(2001, 4, 12, 0, 0, 0, tz), DateHelper.getTime(2001, 4, 14, 0, 0, 0, tz), tz);
         assertEquals(1, periods.size());
 
@@ -143,7 +91,7 @@ public class ICalTaskTest {
         event.getProperties().add(new RRule(recur));
 
         // check from day before first occurrence
-        ICalTask task = new ICalTask(null, ctx, event, null);
+        ICalTask task = new ICalTask(ctx, event, null);
         List<Long> periods = task.getRunsDuringInterval(DateHelper.getTime(2014, 6, 1, 9, 0, 0, tz), DateHelper.getTime(2014, 8, 31, 23, 59, 59, tz), tz);
         assertEquals(31, periods.size());
         assertEquals(DateHelper.getTime(2014, 6, 1, 9, 0, 0, tz), (long)periods.get(0));
@@ -182,165 +130,164 @@ public class ICalTaskTest {
 
     @Test
     public void testJSONRuleConstruction() throws Exception {
-        ICalTaskProvider provider = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
-        provider.setScheduleExecutor(new MockScheduledTaskExecutor());
+        PluginContext pctx = PluginContext.createLocal("pluginId");
+        MockTaskManager taskManager = new MockTaskManager();
+        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(pctx, "foo");
+        taskManager.publishConditionClass(new TaskConditionClass(pccc, "foo", "") {
+            @Override
+            public ConditionClassType getType() {
+                return ConditionClassType.trigger;
+            }
 
-        // validate we start with a non-existent temp file
-        File calendarFile = File.createTempFile("schedule", ".ics");
-        assertTrue(calendarFile.delete());
-        assertFalse(calendarFile.exists());
+            @Override
+            public List<TypedProperty> createProperties() {
+                return null;
+            }
 
-        try {
-            provider.setScheduleFile(calendarFile);
-            provider.reloadScheduleFile();
+            @Override
+            public boolean evaluate(ConditionEvaluationContext context, PropertyContainer values) {
+                return false;
+            }
+        });
+        ICalTaskProvider provider = new ICalTaskProvider(pctx, null, null);
+        provider.setTaskManager(taskManager);
+        provider.setScheduleExecutor(new MockTaskQueue());
 
-            Map<String,Object> props = new HashMap<>();
-            props.put("date", "2014-07-01");
-            props.put("time", "10:00:00Z");
-            props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
-            provider.onCreateTask(
-                "My Task",
-                    null, new PropertyContainerSet(
-                    new PropertyContainer(
-                        PropertyContainerClassContext.create(PluginContext.createLocal("pluginId"), "foo"),
-                        props
-                    )
-                ),
-                new PropertyContainerSet(
-                    "foo",
-                    null
-                )
-            );
+        Map<String,Object> props = new HashMap<>();
+        props.put("date", "2014-07-01");
+        props.put("time", "10:00:00Z");
+        props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
+        HobsonTask task = new HobsonTask(
+            TaskContext.create(HubContext.createLocal(), "taskId"),
+            "My Task",
+            null,
+            null,
+            Collections.singletonList(new PropertyContainer(pccc, props)),
+            new PropertyContainerSet("foo", null)
+        );
+        provider.onCreateTasks(Collections.singletonList(task));
 
-            // make sure the provider updated the rule file
-            assertTrue(calendarFile.exists());
-            Calendar cal = new CalendarBuilder().build(new FileReader(calendarFile));
+        // make sure the provider updated the rule file
+        Calendar cal = provider.getCalendar();
 
-            assertEquals(2, cal.getComponents().size());
-            assertTrue(cal.getComponents().get(0) instanceof VJournal);
-            assertTrue(cal.getComponents().get(1) instanceof VEvent);
+        assertEquals(1, cal.getComponents().size());
+        assertTrue(cal.getComponents().get(0) instanceof VEvent);
 
-            VEvent event = (VEvent)cal.getComponents().get(1);
-            assertNotNull(event.getUid().getValue());
-            assertEquals("My Task", event.getSummary().getValue());
+        VEvent event = (VEvent)cal.getComponents().get(0);
+        assertNotNull(event.getUid().getValue());
 
-            assertEquals("20140701T100000Z", event.getProperties().getProperty("DTSTART").getValue());
-            assertEquals("FREQ=MINUTELY;INTERVAL=1", event.getProperties().getProperty("RRULE").getValue());
-
-            assertNotNull(event.getProperties().getProperty(ICalTask.PROP_ACTION_SET));
-            assertEquals("foo", event.getProperties().getProperty(ICalTask.PROP_ACTION_SET).getValue());
-        } finally {
-            assertTrue(calendarFile.delete());
-        }
+        assertEquals("20140701T100000Z", event.getProperties().getProperty("DTSTART").getValue());
+        assertEquals("FREQ=MINUTELY;INTERVAL=1", event.getProperties().getProperty("RRULE").getValue());
     }
 
     @Test
     public void testJSONRuleConstructionWithNeverRecurrence() throws Exception {
+        PluginContext pctx = PluginContext.createLocal("pluginId");
+        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(pctx, "foo");
+
+        MockTaskManager taskManager = new MockTaskManager();
+        taskManager.publishConditionClass(new TaskConditionClass(pccc, "", "") {
+            @Override
+            public ConditionClassType getType() {
+                return ConditionClassType.trigger;
+            }
+
+            @Override
+            public List<TypedProperty> createProperties() {
+                return null;
+            }
+
+            @Override
+            public boolean evaluate(ConditionEvaluationContext context, PropertyContainer values) {
+                return false;
+            }
+        });
+
         ICalTaskProvider provider = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
-        provider.setScheduleExecutor(new MockScheduledTaskExecutor());
+        provider.setScheduleExecutor(new MockTaskQueue());
+        provider.setTaskManager(taskManager);
 
-        // validate we start with a non-existent temp file
-        File calendarFile = File.createTempFile("schedule", ".ics");
-        assertTrue(calendarFile.delete());
-        assertFalse(calendarFile.exists());
+        Map<String,Object> props = new HashMap<>();
+        props.put("date", "2014-07-01");
+        props.put("time", "10:00:00Z");
+        props.put("recurrence", "never");
+        HobsonTask task = new HobsonTask(
+            TaskContext.create(HubContext.createLocal(), "taskId"),
+            "My Task",
+            null,
+            null,
+            Collections.singletonList(new PropertyContainer(pccc, props)),
+            new PropertyContainerSet("foo", null)
+        );
 
-        try {
-            provider.setScheduleFile(calendarFile);
-            provider.reloadScheduleFile();
+        provider.onCreateTasks(Collections.singletonList(task));
 
-            Map<String,Object> props = new HashMap<>();
-            props.put("date", "2014-07-01");
-            props.put("time", "10:00:00Z");
-            props.put("recurrence", "never");
-            provider.onCreateTask(
-                    "My Task",
-                    null, new PropertyContainerSet(
-                            new PropertyContainer(
-                                    PropertyContainerClassContext.create(PluginContext.createLocal("pluginId"), "foo"),
-                                    props
-                            )
-                    ),
-                    new PropertyContainerSet(
-                            "foo",
-                            null
-                    )
-            );
+        // make sure the provider updated the rule file
+        Calendar cal = provider.getCalendar();
 
-            // make sure the provider updated the rule file
-            assertTrue(calendarFile.exists());
-            Calendar cal = new CalendarBuilder().build(new FileReader(calendarFile));
+        assertEquals(1, cal.getComponents().size());
+        assertTrue(cal.getComponents().get(0) instanceof VEvent);
 
-            assertEquals(2, cal.getComponents().size());
-            assertTrue(cal.getComponents().get(0) instanceof VJournal);
-            assertTrue(cal.getComponents().get(1) instanceof VEvent);
+        VEvent event = (VEvent)cal.getComponents().get(0);
+        assertNotNull(event.getUid().getValue());
 
-            VEvent event = (VEvent)cal.getComponents().get(1);
-            assertNotNull(event.getUid().getValue());
-            assertEquals("My Task", event.getSummary().getValue());
-
-            assertEquals("20140701T100000Z", event.getProperties().getProperty("DTSTART").getValue());
-            assertNull(event.getProperties().getProperty("RRULE"));
-
-            assertNotNull(event.getProperties().getProperty(ICalTask.PROP_ACTION_SET));
-            assertEquals("foo", event.getProperties().getProperty(ICalTask.PROP_ACTION_SET).getValue());
-        } finally {
-            assertTrue(calendarFile.delete());
-        }
+        assertEquals("20140701T100000Z", event.getProperties().getProperty("DTSTART").getValue());
+        assertNull(event.getProperties().getProperty("RRULE"));
     }
 
     @Test
     public void testJSONRuleConstructionWithSunOffset() throws Exception {
-        ICalTaskProvider provider = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
-        provider.setScheduleExecutor(new MockScheduledTaskExecutor());
+        PluginContext pctx = PluginContext.createLocal("plugin1");
+        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(pctx, "foo");
 
-        // validate we start with a non-existent temp file
-        File calendarFile = File.createTempFile("schedule", ".ics");
-        assertTrue(calendarFile.delete());
-        assertFalse(calendarFile.exists());
+        MockTaskManager taskManager = new MockTaskManager();
+        taskManager.publishConditionClass(new TaskConditionClass(pccc, "foo", "") {
+            @Override
+            public ConditionClassType getType() {
+                return ConditionClassType.trigger;
+            }
 
-        try {
-            provider.setScheduleFile(calendarFile);
-            provider.reloadScheduleFile();
+            @Override
+            public List<TypedProperty> createProperties() {
+                return null;
+            }
 
-            Map<String,Object> props = new HashMap<>();
-            props.put("date", "2014-07-01");
-            props.put("time", "SR");
-            props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
-            provider.onCreateTask(
-                "My Task",
-                    null, new PropertyContainerSet(
-                    new PropertyContainer(
-                        PropertyContainerClassContext.create(PluginContext.createLocal("pluginId"), "foo"),
-                        props
-                    )
-                ),
-                new PropertyContainerSet(
-                    "foo",
-                    null
-                )
-            );
+            @Override
+            public boolean evaluate(ConditionEvaluationContext context, PropertyContainer values) {
+                return false;
+            }
+        });
 
-            // make sure the provider updated the rule file
-            assertTrue(calendarFile.exists());
-            Calendar cal = new CalendarBuilder().build(new FileReader(calendarFile));
+        ICalTaskProvider provider = new ICalTaskProvider(pctx, null, null);
+        provider.setScheduleExecutor(new MockTaskQueue());
+        provider.setTaskManager(taskManager);
 
-            assertEquals(2, cal.getComponents().size());
-            assertTrue(cal.getComponents().get(0) instanceof VJournal);
-            assertTrue(cal.getComponents().get(1) instanceof VEvent);
+        Map<String,Object> props = new HashMap<>();
+        props.put("date", "2014-07-01");
+        props.put("time", "SR");
+        props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
+        HobsonTask task = new HobsonTask(
+            TaskContext.create(HubContext.createLocal(), "taskId"),
+            "My Task",
+            null,
+            null,
+            Collections.singletonList(new PropertyContainer(pccc, props)),
+            new PropertyContainerSet("foo", null)
+        );
+        provider.onCreateTasks(Collections.singletonList(task));
 
-            VEvent event = (VEvent)cal.getComponents().get(1);
-            assertNotNull(event.getUid().getValue());
-            assertEquals("My Task", event.getSummary().getValue());
+        // make sure the provider updated the rule file
+        Calendar cal = provider.getCalendar();
 
-            assertEquals("20140701T000000", event.getProperties().getProperty("DTSTART").getValue());
-            assertEquals("FREQ=MINUTELY;INTERVAL=1", event.getProperties().getProperty("RRULE").getValue());
-            assertEquals("SR", event.getProperties().getProperty(ICalTask.PROP_SUN_OFFSET).getValue());
+        assertEquals(1, cal.getComponents().size());
+        assertTrue(cal.getComponents().get(0) instanceof VEvent);
 
-            assertNotNull(event.getProperties().getProperty("X-ACTION-SET"));
-            assertEquals("foo", event.getProperties().getProperty("X-ACTION-SET").getValue());
-        } finally {
-            assertTrue(calendarFile.delete());
-        }
+        VEvent event = (VEvent)cal.getComponents().get(0);
+        assertNotNull(event.getUid().getValue());
+
+        assertEquals("20140701T000000", event.getProperties().getProperty("DTSTART").getValue());
+        assertEquals("FREQ=MINUTELY;INTERVAL=1", event.getProperties().getProperty("RRULE").getValue());
+        assertEquals("SR", event.getProperties().getProperty(ICalTask.PROP_SUN_OFFSET).getValue());
     }
 
     @Test
@@ -355,9 +302,8 @@ public class ICalTaskTest {
         Recur recur = new Recur("FREQ=DAILY;INTERVAL=1");
         event.getProperties().add(new RRule(recur));
 
-        ICalTask task = new ICalTask(am, ctx, event, null);
-        task.setLatitude(39.3722);
-        task.setLongitude(-104.8561);
+        ICalTask task = new ICalTask(ctx, event, null);
+        task.setLocation(39.3722, -104.8561);
 
         List<Long> runs = task.getRunsDuringInterval(DateHelper.getTime(2014, 10, 19, 0, 0, 0, tz), DateHelper.getTime(2014, 10, 19, 23, 59, 59, tz), tz);
         assertEquals(1, runs.size());
@@ -390,11 +336,10 @@ public class ICalTaskTest {
         Recur recur = new Recur("FREQ=DAILY;INTERVAL=1");
         event.getProperties().add(new RRule(recur));
 
-        ICalTask task = new ICalTask(am, ctx, event, null);
+        ICalTask task = new ICalTask(ctx, event, null);
 
-        List<Long> runs = null;
         try {
-            runs = task.getRunsDuringInterval(DateHelper.getTime(2014, 10, 19, 0, 0, 0, tz), DateHelper.getTime(2014, 10, 19, 23, 59, 59, tz), tz);
+            task.getRunsDuringInterval(DateHelper.getTime(2014, 10, 19, 0, 0, 0, tz), DateHelper.getTime(2014, 10, 19, 23, 59, 59, tz), tz);
             fail("Should have thrown exception");
         } catch (SchedulingException ignored) {}
     }
