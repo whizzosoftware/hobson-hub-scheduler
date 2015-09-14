@@ -12,6 +12,7 @@ import com.whizzosoftware.hobson.api.plugin.PluginContext;
 import com.whizzosoftware.hobson.api.task.*;
 import com.whizzosoftware.hobson.scheduler.DayResetListener;
 import com.whizzosoftware.hobson.scheduler.SchedulingException;
+import com.whizzosoftware.hobson.scheduler.TaskNotFoundException;
 import com.whizzosoftware.hobson.scheduler.condition.TriggerConditionListener;
 import com.whizzosoftware.hobson.scheduler.queue.TaskQueue;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
@@ -307,6 +308,25 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
 
     @Override
     public void onDeleteTask(TaskContext ctx) {
-        // TODO
+        // first cancel the task if it is queued to run
+        try {
+            taskQueue.cancel(ctx);
+        } catch (TaskNotFoundException e) {
+            logger.debug("Unable to find task to cancel; ignoring", e);
+        }
+
+        // then remove it from the calendar
+        Component c = null;
+        for (Object e : calendar.getComponents()) {
+            if (e instanceof VEvent) {
+                if (((VEvent)e).getUid().getValue().equals(ctx.getTaskId())) {
+                    logger.debug("Deleting task: {}", ctx);
+                    c = (Component)e;
+                }
+            }
+        }
+        if (c != null) {
+            calendar.getComponents().remove(c);
+        }
     }
 }
