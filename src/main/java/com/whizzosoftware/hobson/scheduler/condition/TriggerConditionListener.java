@@ -9,6 +9,11 @@ package com.whizzosoftware.hobson.scheduler.condition;
 
 import com.whizzosoftware.hobson.scheduler.ical.ICalTask;
 
+/**
+ * Interface for listeners to be alerted when a trigger condition occurs.
+ *
+ * @author Dan Noguerol
+ */
 public interface TriggerConditionListener {
-    public void onTriggerCondition(ICalTask task, long now);
+    void onTriggerCondition(ICalTask task, long now);
 }
