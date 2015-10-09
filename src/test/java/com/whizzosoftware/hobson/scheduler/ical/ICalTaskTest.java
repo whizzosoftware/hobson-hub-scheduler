@@ -135,7 +135,7 @@ public class ICalTaskTest {
         PropertyContainerClassContext pccc = PropertyContainerClassContext.create(pctx, "foo");
         taskManager.publishConditionClass(new TaskConditionClass(pccc, "foo", "") {
             @Override
-            public ConditionClassType getType() {
+            public ConditionClassType getConditionClassType() {
                 return ConditionClassType.trigger;
             }
 
@@ -188,7 +188,7 @@ public class ICalTaskTest {
         MockTaskManager taskManager = new MockTaskManager();
         taskManager.publishConditionClass(new TaskConditionClass(pccc, "", "") {
             @Override
-            public ConditionClassType getType() {
+            public ConditionClassType getConditionClassType() {
                 return ConditionClassType.trigger;
             }
 
@@ -243,7 +243,7 @@ public class ICalTaskTest {
         MockTaskManager taskManager = new MockTaskManager();
         taskManager.publishConditionClass(new TaskConditionClass(pccc, "foo", "") {
             @Override
-            public ConditionClassType getType() {
+            public ConditionClassType getConditionClassType() {
                 return ConditionClassType.trigger;
             }
 

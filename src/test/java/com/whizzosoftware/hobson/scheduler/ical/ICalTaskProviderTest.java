@@ -416,7 +416,7 @@ public class ICalTaskProviderTest {
         MockTaskManager mgr = new MockTaskManager();
         mgr.publishConditionClass(new TaskConditionClass(pccc, "schedule", "") {
             @Override
-            public ConditionClassType getType() {
+            public ConditionClassType getConditionClassType() {
                 return ConditionClassType.trigger;
             }
 
