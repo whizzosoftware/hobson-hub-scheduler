@@ -8,6 +8,7 @@
 package com.whizzosoftware.hobson.scheduler.condition;
 
 import com.whizzosoftware.hobson.api.plugin.PluginContext;
+import com.whizzosoftware.hobson.api.property.PropertyConstraintType;
 import com.whizzosoftware.hobson.api.property.PropertyContainer;
 import com.whizzosoftware.hobson.api.property.PropertyContainerClassContext;
 import com.whizzosoftware.hobson.api.property.TypedProperty;
@@ -43,9 +44,17 @@ public class ScheduleConditionClass extends TaskConditionClass {
     @Override
     protected List<TypedProperty> createProperties() {
         List<TypedProperty> props = new ArrayList<>();
-        props.add(new TypedProperty("date", "Start date", "The date the task will first occur", TypedProperty.Type.DATE));
-        props.add(new TypedProperty("time", "Start time", "The time of day the task will occur", TypedProperty.Type.TIME));
-        props.add(new TypedProperty("recurrence", "Repeat", "How often the task should repeat", TypedProperty.Type.RECURRENCE));
+        props.add(new TypedProperty.Builder("date", "Start date", "The date the task will first occur", TypedProperty.Type.DATE).
+            constraint(PropertyConstraintType.required, true).
+            build()
+        );
+        props.add(new TypedProperty.Builder("time", "Start time", "The time of day the task will occur", TypedProperty.Type.TIME).
+            constraint(PropertyConstraintType.required, true).
+            build()
+        );
+        props.add(new TypedProperty.Builder("recurrence", "Repeat", "How often the task should repeat", TypedProperty.Type.RECURRENCE).
+            build()
+        );
         return props;
     }
 }
