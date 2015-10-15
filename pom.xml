@@ -101,7 +101,7 @@
                 <extensions>true</extensions>
                 <configuration>
                     <instructions>
-                        <Import-Package>org.osgi.framework,org.osgi.service.event,org.apache.felix.dm.*,org.slf4j,org.apache.commons.logging,org.json.*,org.joda.time.*,org.apache.commons.lang3.*,com.whizzosoftware.hobson.api.*;version="[0.5.0,0.6)</Import-Package>
+                        <Import-Package>org.osgi.framework,org.osgi.service.event,org.apache.felix.dm.*,org.slf4j,org.apache.commons.logging,org.json.*,org.joda.time.*,org.apache.commons.lang3.*,com.whizzosoftware.hobson.api.*;version="[0.6.0,0.7)</Import-Package>
                         <Bundle-Activator>com.whizzosoftware.hobson.api.osgi.activator.HobsonBundleActivator</Bundle-Activator>
                         <Embed-Dependency>ical4j;scope=compile|runtime,backport-util-concurrent;scope=compile|runtime,org.apache.servicemix.bundles.commons-beanutils;scope=compile|runtime,org.apache.servicemix.bundles.commons-lang;scope=compile|runtime,SunriseSunsetCalculator;scope=compile|runtime</Embed-Dependency>
                         <Provide-Capability>hobson.plugin=com.whizzosoftware.hobson.scheduler.SchedulerPlugin</Provide-Capability>
