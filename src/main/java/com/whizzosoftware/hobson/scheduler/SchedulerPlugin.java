@@ -146,16 +146,17 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     }
 
     private void updateSunriseSunset(long now) {
+        String sunrise = null;
+        String sunset = null;
         if (latitude != null && longitude != null) {
             String[] ss = SolarHelper.getSunriseSunset(latitude, longitude, DateTimeZone.forID("America/Denver"), now);
-            String sunrise = ss[0];
-            String sunset = ss[1];
+            sunrise = ss[0];
+            sunset = ss[1];
             logger.debug("Sunrise: {}, sunset: {}", sunrise, sunset);
-
-            List<VariableUpdate> updates = new ArrayList<>();
-            updates.add(new VariableUpdate(DeviceContext.createLocalGlobal(getContext().getPluginId()), SUNRISE, sunrise));
-            updates.add(new VariableUpdate(DeviceContext.createLocalGlobal(getContext().getPluginId()), SUNSET, sunset));
-            fireVariableUpdateNotifications(updates);
         }
+        List<VariableUpdate> updates = new ArrayList<>();
+        updates.add(new VariableUpdate(DeviceContext.createLocalGlobal(getContext().getPluginId()), SUNRISE, sunrise));
+        updates.add(new VariableUpdate(DeviceContext.createLocalGlobal(getContext().getPluginId()), SUNSET, sunset));
+        fireVariableUpdateNotifications(updates);
     }
 }
