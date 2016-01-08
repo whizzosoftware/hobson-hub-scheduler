@@ -7,7 +7,6 @@
  *******************************************************************************/
 package com.whizzosoftware.hobson.scheduler;
 
-import com.whizzosoftware.hobson.api.device.DeviceContext;
 import com.whizzosoftware.hobson.api.event.HobsonEvent;
 import com.whizzosoftware.hobson.api.event.HubConfigurationUpdateEvent;
 import com.whizzosoftware.hobson.api.hub.HubConfigurationClass;
@@ -18,6 +17,7 @@ import com.whizzosoftware.hobson.api.property.PropertyContainer;
 import com.whizzosoftware.hobson.api.property.TypedProperty;
 import com.whizzosoftware.hobson.api.task.TaskProvider;
 import com.whizzosoftware.hobson.api.variable.HobsonVariable;
+import com.whizzosoftware.hobson.api.variable.VariableContext;
 import com.whizzosoftware.hobson.api.variable.VariableUpdate;
 import com.whizzosoftware.hobson.scheduler.condition.ScheduleConditionClass;
 import com.whizzosoftware.hobson.scheduler.queue.LocalTaskQueue;
@@ -155,8 +155,8 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
             logger.debug("Sunrise: {}, sunset: {}", sunrise, sunset);
         }
         List<VariableUpdate> updates = new ArrayList<>();
-        updates.add(new VariableUpdate(DeviceContext.createLocalGlobal(getContext().getPluginId()), SUNRISE, sunrise));
-        updates.add(new VariableUpdate(DeviceContext.createLocalGlobal(getContext().getPluginId()), SUNSET, sunset));
+        updates.add(new VariableUpdate(VariableContext.createGlobal(getContext(), SUNRISE), sunrise));
+        updates.add(new VariableUpdate(VariableContext.createGlobal(getContext(), SUNSET), sunset));
         fireVariableUpdateNotifications(updates);
     }
 }
