@@ -67,15 +67,17 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
         // set the initial sunrise and sunset
         String sunrise = null;
         String sunset = null;
+        Long lastUpdate = null;
         String ss[] = SolarHelper.getSunriseSunset(latitude, longitude, DateTimeZone.getDefault(), System.currentTimeMillis());
         if (ss != null) {
             sunrise = ss[0];
             sunset = ss[1];
+            lastUpdate = System.currentTimeMillis();
         }
 
         // publish sunrise/sunset global variables
-        publishGlobalVariable(SUNRISE, sunrise, HobsonVariable.Mask.READ_ONLY);
-        publishGlobalVariable(SUNSET, sunset, HobsonVariable.Mask.READ_ONLY);
+        publishGlobalVariable(SUNRISE, sunrise, HobsonVariable.Mask.READ_ONLY, lastUpdate);
+        publishGlobalVariable(SUNSET, sunset, HobsonVariable.Mask.READ_ONLY, lastUpdate);
 
         // set the plugin to running status
         setStatus(new PluginStatus(PluginStatus.Code.RUNNING));
