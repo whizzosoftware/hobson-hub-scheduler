@@ -16,9 +16,6 @@ import com.whizzosoftware.hobson.api.plugin.PluginType;
 import com.whizzosoftware.hobson.api.property.PropertyContainer;
 import com.whizzosoftware.hobson.api.property.TypedProperty;
 import com.whizzosoftware.hobson.api.task.TaskProvider;
-import com.whizzosoftware.hobson.api.variable.HobsonVariable;
-import com.whizzosoftware.hobson.api.variable.VariableContext;
-import com.whizzosoftware.hobson.api.variable.VariableUpdate;
 import com.whizzosoftware.hobson.scheduler.condition.ScheduleConditionClass;
 import com.whizzosoftware.hobson.scheduler.queue.LocalTaskQueue;
 import com.whizzosoftware.hobson.scheduler.ical.ICalTaskProvider;
@@ -76,8 +73,10 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
         }
 
         // publish sunrise/sunset global variables
-        publishGlobalVariable(SUNRISE, sunrise, HobsonVariable.Mask.READ_ONLY, lastUpdate);
-        publishGlobalVariable(SUNSET, sunset, HobsonVariable.Mask.READ_ONLY, lastUpdate);
+        Map<String,Object> vars = new HashMap<>();
+        vars.put(SUNRISE, sunrise);
+        vars.put(SUNSET, sunset);
+        setGlobalVariables(vars, lastUpdate != null ? lastUpdate : System.currentTimeMillis());
 
         // set the plugin to running status
         setStatus(new PluginStatus(PluginStatus.Code.RUNNING));
@@ -89,7 +88,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     }
 
     @Override
-    protected TypedProperty[] createSupportedProperties() {
+    protected TypedProperty[] getConfigurationPropertyTypes() {
         return null;
     }
 
@@ -156,9 +155,10 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
             sunset = ss[1];
             logger.debug("Sunrise: {}, sunset: {}", sunrise, sunset);
         }
-        List<VariableUpdate> updates = new ArrayList<>();
-        updates.add(new VariableUpdate(VariableContext.createGlobal(getContext(), SUNRISE), sunrise));
-        updates.add(new VariableUpdate(VariableContext.createGlobal(getContext(), SUNSET), sunset));
-        fireVariableUpdateNotifications(updates);
+
+        Map<String,Object> vars = new HashMap<>();
+        vars.put(SUNRISE, sunrise);
+        vars.put(SUNSET, sunset);
+        setGlobalVariables(vars, now);
     }
 }
