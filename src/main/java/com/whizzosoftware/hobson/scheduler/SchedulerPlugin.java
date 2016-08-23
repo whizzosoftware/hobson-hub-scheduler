@@ -151,7 +151,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
         String sunrise = null;
         String sunset = null;
         if (latitude != null && longitude != null) {
-            String[] ss = SolarHelper.getSunriseSunset(latitude, longitude, DateTimeZone.forID("America/Denver"), now);
+            String[] ss = SolarHelper.getSunriseSunset(latitude, longitude, DateTimeZone.getDefault(), now);
             sunrise = ss[0];
             sunset = ss[1];
             logger.debug("Sunrise: {}, sunset: {}", sunrise, sunset);
