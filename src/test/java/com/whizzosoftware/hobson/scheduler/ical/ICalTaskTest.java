@@ -13,9 +13,7 @@ import com.whizzosoftware.hobson.api.property.PropertyContainer;
 import com.whizzosoftware.hobson.api.property.PropertyContainerClassContext;
 import com.whizzosoftware.hobson.api.property.PropertyContainerSet;
 import com.whizzosoftware.hobson.api.property.TypedProperty;
-import com.whizzosoftware.hobson.api.task.HobsonTask;
 import com.whizzosoftware.hobson.api.task.MockTaskManager;
-import com.whizzosoftware.hobson.api.task.TaskContext;
 import com.whizzosoftware.hobson.api.task.condition.ConditionClassType;
 import com.whizzosoftware.hobson.api.task.condition.ConditionEvaluationContext;
 import com.whizzosoftware.hobson.api.task.condition.TaskConditionClass;
@@ -157,15 +155,8 @@ public class ICalTaskTest {
         props.put("date", "2014-07-01");
         props.put("time", "10:00:00Z");
         props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
-        HobsonTask task = new HobsonTask(
-            TaskContext.create(HubContext.createLocal(), "taskId"),
-            "My Task",
-            null,
-            null,
-            Collections.singletonList(new PropertyContainer(pccc, props)),
-            new PropertyContainerSet("foo", null)
-        );
-        provider.onCreateTasks(Collections.singletonList(task));
+        taskManager.createTask(HubContext.createLocal(), "My Task", null, Collections.singletonList(new PropertyContainer(pccc, props)), new PropertyContainerSet("foo", null));
+        provider.onRegisterTasks(Collections.singletonList(taskManager.getTasks(HubContext.createLocal()).iterator().next().getContext()));
 
         // make sure the provider updated the rule file
         Calendar cal = provider.getCalendar();
@@ -211,16 +202,9 @@ public class ICalTaskTest {
         props.put("date", "2014-07-01");
         props.put("time", "10:00:00Z");
         props.put("recurrence", "never");
-        HobsonTask task = new HobsonTask(
-            TaskContext.create(HubContext.createLocal(), "taskId"),
-            "My Task",
-            null,
-            null,
-            Collections.singletonList(new PropertyContainer(pccc, props)),
-            new PropertyContainerSet("foo", null)
-        );
+        taskManager.createTask(HubContext.createLocal(), "My Task", null, Collections.singletonList(new PropertyContainer(pccc, props)), new PropertyContainerSet("foo", null));
 
-        provider.onCreateTasks(Collections.singletonList(task));
+        provider.onRegisterTasks(Collections.singletonList(taskManager.getTasks(HubContext.createLocal()).iterator().next().getContext()));
 
         // make sure the provider updated the rule file
         Calendar cal = provider.getCalendar();
@@ -266,15 +250,8 @@ public class ICalTaskTest {
         props.put("date", "2014-07-01");
         props.put("time", "SR");
         props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
-        HobsonTask task = new HobsonTask(
-            TaskContext.create(HubContext.createLocal(), "taskId"),
-            "My Task",
-            null,
-            null,
-            Collections.singletonList(new PropertyContainer(pccc, props)),
-            new PropertyContainerSet("foo", null)
-        );
-        provider.onCreateTasks(Collections.singletonList(task));
+        taskManager.createTask(HubContext.createLocal(), "My Task", null, Collections.singletonList(new PropertyContainer(pccc, props)), new PropertyContainerSet("foo", null));
+        provider.onRegisterTasks(Collections.singletonList(taskManager.getTasks(HubContext.createLocal()).iterator().next().getContext()));
 
         // make sure the provider updated the rule file
         Calendar cal = provider.getCalendar();

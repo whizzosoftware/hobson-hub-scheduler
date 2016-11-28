@@ -1,10 +1,12 @@
-/*******************************************************************************
+/*
+ *******************************************************************************
  * Copyright (c) 2014 Whizzo Software, LLC.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- *******************************************************************************/
+ *******************************************************************************
+*/
 package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.api.HobsonRuntimeException;
@@ -19,7 +21,8 @@ import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.model.*;
 import net.fortuna.ical4j.model.Calendar;
 import net.fortuna.ical4j.model.component.VEvent;
-import org.joda.time.DateTimeZone;
+import org.joda.time.*;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -276,33 +279,40 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
     }
 
     @Override
-    public void onCreateTasks(Collection<HobsonTask> tasks) {
+    public void onRegisterTasks(Collection<TaskContext> tasks) {
         onCreateTasks(tasks, System.currentTimeMillis());
     }
 
-    protected List<ICalTask> onCreateTasks(Collection<HobsonTask> tasks, long startOfDay) {
+    @Override
+    public void onCreateTask(TaskContext ctx) {
+        onCreateTask(taskManager.getTask(ctx), System.currentTimeMillis());
+    }
+
+    protected ICalTask onCreateTask(HobsonTask task, long startOfDay) {
+        try {
+            ICalTask ict = new ICalTask(task.getContext(), TaskHelper.getTriggerCondition(taskManager, task.getConditions()));
+            ict.setLocation(latitude, longitude);
+            calendar.getComponents().add(ict.getVEvent());
+            addTask(ict, startOfDay, false);
+            return ict;
+        } catch (Exception e) {
+            throw new HobsonRuntimeException("Error creating task", e);
+        }
+    }
+
+    protected List<ICalTask> onCreateTasks(Collection<TaskContext> tasks, long startOfDay) {
         List<ICalTask> results = new ArrayList<>();
 
-        for (HobsonTask task : tasks) {
-            try {
-                ICalTask ict = new ICalTask(task.getContext(), TaskHelper.getTriggerCondition(taskManager, task.getConditions()));
-                ict.setLocation(latitude, longitude);
-
-                calendar.getComponents().add(ict.getVEvent());
-
-                addTask(ict, startOfDay, false);
-
-                results.add(ict);
-            } catch (Exception e) {
-                throw new HobsonRuntimeException("Error creating task", e);
-            }
+        for (TaskContext ctx : tasks) {
+            HobsonTask task = taskManager.getTask(ctx);
+            results.add(onCreateTask(task, startOfDay));
         }
 
         return results;
     }
 
     @Override
-    public void onUpdateTask(HobsonTask task) {
+    public void onUpdateTask(TaskContext ctx) {
         // TODO
     }
 

@@ -1,21 +1,22 @@
-/*******************************************************************************
+/*
+ *******************************************************************************
  * Copyright (c) 2014 Whizzo Software, LLC.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- *******************************************************************************/
+ *******************************************************************************
+*/
 package com.whizzosoftware.hobson.scheduler;
 
-import com.whizzosoftware.hobson.api.event.HobsonEvent;
-import com.whizzosoftware.hobson.api.event.HubConfigurationUpdateEvent;
+import com.whizzosoftware.hobson.api.event.EventHandler;
+import com.whizzosoftware.hobson.api.event.hub.HubConfigurationUpdateEvent;
 import com.whizzosoftware.hobson.api.hub.HubConfigurationClass;
 import com.whizzosoftware.hobson.api.plugin.AbstractHobsonPlugin;
 import com.whizzosoftware.hobson.api.plugin.PluginStatus;
 import com.whizzosoftware.hobson.api.plugin.PluginType;
 import com.whizzosoftware.hobson.api.property.PropertyContainer;
 import com.whizzosoftware.hobson.api.property.TypedProperty;
-import com.whizzosoftware.hobson.api.task.TaskProvider;
 import com.whizzosoftware.hobson.scheduler.condition.ScheduleConditionClass;
 import com.whizzosoftware.hobson.scheduler.queue.LocalTaskQueue;
 import com.whizzosoftware.hobson.scheduler.ical.ICalTaskProvider;
@@ -37,12 +38,11 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     private static final String SUNRISE = "sunrise";
     private static final String SUNSET = "sunset";
 
-    private ICalTaskProvider taskProvider;
     private Double latitude;
     private Double longitude;
 
-    public SchedulerPlugin(String pluginId) {
-        super(pluginId);
+    public SchedulerPlugin(String pluginId, String version, String description) {
+        super(pluginId, version, description);
     }
 
     @Override
@@ -52,14 +52,15 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
         longitude = getHubLongitude();
 
         // create an ical task provider
-        taskProvider = new ICalTaskProvider(getContext(), latitude, longitude);
+        ICalTaskProvider taskProvider = new ICalTaskProvider(getContext(), latitude, longitude);
         taskProvider.setScheduleExecutor(new LocalTaskQueue(getTaskManager()));
         taskProvider.setTaskManager(getTaskManager());
         taskProvider.setDayResetListener(this);
         taskProvider.start();
+        setTaskProvider(taskProvider);
 
         // publish conditions that this plugin can trigger
-        publishConditionClass(new ScheduleConditionClass(getContext()));
+        publishTaskConditionClass(new ScheduleConditionClass(getContext()));
 
         // set the initial sunrise and sunset
         String sunrise = null;
@@ -84,16 +85,12 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
 
     @Override
     public void onShutdown() {
-        taskProvider.stop();
+        ((ICalTaskProvider)getTaskProvider()).stop();
     }
 
     @Override
     protected TypedProperty[] getConfigurationPropertyTypes() {
         return null;
-    }
-
-    public TaskProvider getTaskProvider() {
-        return taskProvider;
     }
 
     @Override
@@ -102,22 +99,13 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     }
 
     @Override
-    public void onPluginConfigurationUpdate(PropertyContainer config) {
-    }
-
-    @Override
     public String getName() {
         return "Hobson Scheduler";
     }
 
-    @Override
-    public void onHobsonEvent(HobsonEvent event) {
-        super.onHobsonEvent(event);
-
-        // update latitude and longitude if they've changed
-        if (event instanceof HubConfigurationUpdateEvent) {
-            updateLatitudeLongitude(getHubLatitude(), getHubLongitude());
-        }
+    @EventHandler
+    public void onHobsonEvent(HubConfigurationUpdateEvent event) {
+        updateLatitudeLongitude(getHubLatitude(), getHubLongitude());
     }
 
     @Override
@@ -129,11 +117,11 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     }
 
     private Double getHubLatitude() {
-        return (Double)getHub().getConfiguration().getPropertyValue(HubConfigurationClass.LATITUDE);
+        return (Double)getLocalHub().getConfiguration().getPropertyValue(HubConfigurationClass.LATITUDE);
     }
 
     private Double getHubLongitude() {
-        return (Double)getHub().getConfiguration().getPropertyValue(HubConfigurationClass.LONGITUDE);
+        return (Double)getLocalHub().getConfiguration().getPropertyValue(HubConfigurationClass.LONGITUDE);
     }
 
     private void updateLatitudeLongitude(Double latitude, Double longitude) {
@@ -141,7 +129,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
             logger.debug("Latitude and longitude have changed");
             this.latitude = latitude;
             this.longitude = longitude;
-            taskProvider.setLatitudeLongitude(latitude, longitude);
+            ((ICalTaskProvider)getTaskProvider()).setLatitudeLongitude(latitude, longitude);
             updateSunriseSunset(System.currentTimeMillis());
         }
     }
