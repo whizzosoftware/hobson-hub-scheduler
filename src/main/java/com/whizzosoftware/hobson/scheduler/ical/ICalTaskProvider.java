@@ -1,10 +1,12 @@
-/*******************************************************************************
+/*
+ *******************************************************************************
  * Copyright (c) 2014 Whizzo Software, LLC.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- *******************************************************************************/
+ *******************************************************************************
+*/
 package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.api.HobsonRuntimeException;
@@ -19,7 +21,8 @@ import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.model.*;
 import net.fortuna.ical4j.model.Calendar;
 import net.fortuna.ical4j.model.component.VEvent;
-import org.joda.time.DateTimeZone;
+import org.joda.time.*;
+import org.joda.time.DateTime;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,14 +38,14 @@ import java.util.concurrent.TimeUnit;
 public class ICalTaskProvider implements TaskProvider, TriggerConditionListener {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
-    private static final long MS_24_HOURS = 86400000;
+    public static final long MS_24_HOURS = 86400000;
 
     private PluginContext pluginContext;
     private TaskManager taskManager;
     private DayResetListener dayResetListener;
     private Calendar calendar = new Calendar();
     private TaskQueue taskQueue;
-    private ScheduledThreadPoolExecutor resetDayExecutor;
+    private ScheduledThreadPoolExecutor resetDayExecutor = new ScheduledThreadPoolExecutor(1);
     private Double latitude;
     private Double longitude;
     private DateTimeZone timeZone;
@@ -177,19 +180,8 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
 
     public void start() {
         if (!running) {
-            long initialDelay = DateHelper.getMillisecondsUntilMidnight(System.currentTimeMillis(), timeZone);
-
             taskQueue.start();
-
-            logger.debug("New day will start in {} seconds", (initialDelay / 1000));
-            resetDayExecutor = new ScheduledThreadPoolExecutor(1);
-            resetDayExecutor.scheduleAtFixedRate(new Runnable() {
-                @Override
-                public void run() {
-                    resetForNewDay(System.currentTimeMillis());
-                }
-            }, initialDelay, MS_24_HOURS, TimeUnit.MILLISECONDS);
-
+            scheduleNextWakeup();
             running = true;
         }
     }
@@ -205,6 +197,8 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
     }
 
     public void resetForNewDay(long now) {
+        logger.debug("Resetting for new day at {}", new DateTime(now));
+
         // alert listener
         if (dayResetListener != null) {
             dayResetListener.onDayReset(now);
@@ -216,6 +210,21 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
         } catch (Exception e) {
             logger.error("Error reloading calendar file on day reset", e);
         }
+
+        // schedule the next run
+        scheduleNextWakeup();
+    }
+
+    private void scheduleNextWakeup() {
+        long now = System.currentTimeMillis();
+        long delay = DateHelper.getMillisecondsUntilMidnight(now, timeZone);
+        logger.debug("New day will start at {} ({} seconds)", new DateTime(now + delay), (delay / 1000));
+        resetDayExecutor.schedule(new Runnable() {
+            @Override
+            public void run() {
+                resetForNewDay(System.currentTimeMillis());
+            }
+        }, delay, TimeUnit.MILLISECONDS);
     }
 
     @Override
