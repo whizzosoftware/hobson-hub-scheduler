@@ -285,33 +285,40 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
     }
 
     @Override
-    public void onCreateTasks(Collection<HobsonTask> tasks) {
+    public void onRegisterTasks(Collection<TaskContext> tasks) {
         onCreateTasks(tasks, System.currentTimeMillis());
     }
 
-    protected List<ICalTask> onCreateTasks(Collection<HobsonTask> tasks, long startOfDay) {
+    @Override
+    public void onCreateTask(TaskContext ctx) {
+        onCreateTask(taskManager.getTask(ctx), System.currentTimeMillis());
+    }
+
+    protected ICalTask onCreateTask(HobsonTask task, long startOfDay) {
+        try {
+            ICalTask ict = new ICalTask(task.getContext(), TaskHelper.getTriggerCondition(taskManager, task.getConditions()));
+            ict.setLocation(latitude, longitude);
+            calendar.getComponents().add(ict.getVEvent());
+            addTask(ict, startOfDay, false);
+            return ict;
+        } catch (Exception e) {
+            throw new HobsonRuntimeException("Error creating task", e);
+        }
+    }
+
+    protected List<ICalTask> onCreateTasks(Collection<TaskContext> tasks, long startOfDay) {
         List<ICalTask> results = new ArrayList<>();
 
-        for (HobsonTask task : tasks) {
-            try {
-                ICalTask ict = new ICalTask(task.getContext(), TaskHelper.getTriggerCondition(taskManager, task.getConditions()));
-                ict.setLocation(latitude, longitude);
-
-                calendar.getComponents().add(ict.getVEvent());
-
-                addTask(ict, startOfDay, false);
-
-                results.add(ict);
-            } catch (Exception e) {
-                throw new HobsonRuntimeException("Error creating task", e);
-            }
+        for (TaskContext ctx : tasks) {
+            HobsonTask task = taskManager.getTask(ctx);
+            results.add(onCreateTask(task, startOfDay));
         }
 
         return results;
     }
 
     @Override
-    public void onUpdateTask(HobsonTask task) {
+    public void onUpdateTask(TaskContext ctx) {
         // TODO
     }
 

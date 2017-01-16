@@ -20,6 +20,7 @@ import com.whizzosoftware.hobson.api.task.condition.ConditionEvaluationContext;
 import com.whizzosoftware.hobson.api.task.condition.TaskConditionClass;
 import com.whizzosoftware.hobson.scheduler.queue.MockTaskQueue;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
+import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -32,7 +33,7 @@ public class ICalTaskProviderTest {
     public void testLoadTaskWithNoTaskManager() {
         ICalTaskProvider provider = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
         try {
-            provider.onCreateTasks(Collections.singletonList(new HobsonTask(TaskContext.createLocal("task1"), null, null, null, null, null)));
+            provider.onRegisterTasks(Collections.singletonList(TaskContext.createLocal("task1")));
             fail("Should have thrown an exception");
         } catch (Exception ignored) {}
     }
@@ -43,7 +44,7 @@ public class ICalTaskProviderTest {
         ICalTaskProvider provider = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
         provider.setTaskManager(taskManager);
         try {
-            provider.onCreateTasks(Collections.singletonList(new HobsonTask(TaskContext.createLocal("task1"), null, null, null, null, null)));
+            provider.onRegisterTasks(Collections.singletonList(TaskContext.createLocal("task1")));
             fail("Should have thrown an exception");
         } catch (Exception ignored) {}
     }
@@ -65,7 +66,7 @@ public class ICalTaskProviderTest {
         ICalTaskProvider s = new ICalTaskProvider(pccc.getPluginContext(), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.onCreateTasks(Collections.singletonList(task), startOfDay);
+        s.onCreateTasks(Collections.singletonList(task.getContext()), startOfDay);
 
         // confirm executor has a delay
         assertTrue(executor.hasDelays());
@@ -91,7 +92,7 @@ public class ICalTaskProviderTest {
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(manager);
         s.setScheduleExecutor(executor);
-        s.onCreateTasks(Collections.singletonList(task), startOfDay);
+        s.onCreateTasks(Collections.singletonList(task.getContext()), startOfDay);
 
         // verify task was scheduled -- should have been scheduled to execute in 61200 seconds (17 hours)
         assertEquals(61200000, (long) executor.getDelayForTask(task.getContext()));
@@ -219,7 +220,7 @@ public class ICalTaskProviderTest {
         s.setLatitudeLongitude(39.3722, -104.8561);
         s.setScheduleExecutor(executor);
 
-        s.onCreateTasks(Collections.singletonList(task), startOfDay);
+        s.onCreateTasks(Collections.singletonList(task.getContext()), startOfDay);
 
         // verify task was created
         assertEquals(1, s.getCalendar().getComponents().size());
@@ -242,7 +243,7 @@ public class ICalTaskProviderTest {
         ICalTaskProvider s = new ICalTaskProvider(pccc.getPluginContext(), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.onCreateTasks(Collections.singletonList(task), schedulerStart);
+        s.onCreateTasks(Collections.singletonList(task.getContext()), schedulerStart);
 
         // verify task was created but not run
         assertEquals(1, s.getCalendar().getComponents().size());
@@ -269,7 +270,7 @@ public class ICalTaskProviderTest {
         s.setScheduleExecutor(executor);
         assertEquals(0, s.getCalendar().getComponents().size());
 
-        s.onCreateTasks(Collections.singletonList(task), DateHelper.getTime(2014, 7, 1, 17, 0, 0, tz));
+        s.onCreateTasks(Collections.singletonList(task.getContext()), DateHelper.getTime(2014, 7, 1, 17, 0, 0, tz));
 
         // verify task was not scheduled
         assertEquals(1, s.getCalendar().getComponents().size());
@@ -304,7 +305,7 @@ public class ICalTaskProviderTest {
 
         assertEquals(0, s.getCalendar().getComponents().size());
 
-        s.onCreateTasks(Collections.singletonList(task), DateHelper.getTime(2014, 7, 1, 22, 0, 0, tz));
+        s.onCreateTasks(Collections.singletonList(task.getContext()), DateHelper.getTime(2014, 7, 1, 22, 0, 0, tz));
 
         // verify task was not scheduled or executed
         assertEquals(1, s.getCalendar().getComponents().size());
@@ -335,7 +336,7 @@ public class ICalTaskProviderTest {
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.onCreateTasks(Collections.singletonList(task), DateHelper.getTime(2014, 7, 1, 23, 0, 0, tz));
+        s.onCreateTasks(Collections.singletonList(task.getContext()), DateHelper.getTime(2014, 7, 1, 23, 0, 0, tz));
 
         // verify task was created and its next run time
         assertEquals(1, s.getCalendar().getComponents().size());
@@ -355,7 +356,7 @@ public class ICalTaskProviderTest {
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.onCreateTasks(Collections.singletonList(task), DateHelper.getTime(2014, 8, 1, 21, 0, 0, tz));
+        s.onCreateTasks(Collections.singletonList(task.getContext()), DateHelper.getTime(2014, 8, 1, 21, 0, 0, tz));
 
         // verify task was created and its next run time
         assertEquals(1, s.getCalendar().getComponents().size());
@@ -376,7 +377,7 @@ public class ICalTaskProviderTest {
         scheduler.setScheduleExecutor(executor);
 
         assertFalse(executor.hasDelays());
-        List<ICalTask> icts = scheduler.onCreateTasks(Collections.singletonList(task), DateHelper.getTime(2014, 7, 1, 11, 0, 1, tz));
+        List<ICalTask> icts = scheduler.onCreateTasks(Collections.singletonList(task.getContext()), DateHelper.getTime(2014, 7, 1, 11, 0, 1, tz));
 
         // verify task was created and scheduled
         assertEquals(1, icts.size());
@@ -406,7 +407,7 @@ public class ICalTaskProviderTest {
         ICalTaskProvider s = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
-        s.onCreateTasks(Collections.singletonList(task), DateHelper.getTime(2014, 7, 1, 22, 0, 0, tz));
+        s.onCreateTasks(Collections.singletonList(task.getContext()), DateHelper.getTime(2014, 7, 1, 22, 0, 0, tz));
 
         assertEquals(1, s.getCalendar().getComponents().size());
         assertTrue(task.getProperties().containsKey(ICalTask.PROP_ERROR));
