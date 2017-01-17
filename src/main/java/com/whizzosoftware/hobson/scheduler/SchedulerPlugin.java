@@ -104,7 +104,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     }
 
     @EventHandler
-    public void onHobsonEvent(HubConfigurationUpdateEvent event) {
+    public void onHubConfigurationUpdate(HubConfigurationUpdateEvent event) {
         updateLatitudeLongitude(getHubLatitude(), getHubLongitude());
     }
 
@@ -125,7 +125,7 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     }
 
     private void updateLatitudeLongitude(Double latitude, Double longitude) {
-        if (this.latitude == null || !this.latitude.equals(latitude) || this.longitude == null || !this.longitude.equals(longitude)) {
+        if ((this.latitude == null && latitude != null) || (this.latitude != null && !this.latitude.equals(latitude)) || (this.longitude == null && longitude != null) || (this.longitude != null && !this.longitude.equals(longitude))) {
             logger.debug("Latitude and longitude have changed");
             this.latitude = latitude;
             this.longitude = longitude;

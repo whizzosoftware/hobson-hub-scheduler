@@ -27,6 +27,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.Date;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -124,6 +125,8 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
      * @throws Exception on failure
      */
     protected boolean scheduleNextRun(ICalTask task, long now, boolean wasDayReset) throws Exception {
+        logger.trace("Attempting to schedule next run of task: {}", task.getContext());
+
         if (taskQueue == null) {
             throw new HobsonRuntimeException("No task executor configured");
         }
@@ -152,10 +155,14 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
                 for (Long l : todaysRunTimes) {
                     if (l - now < 0 && wasDayReset) {
                         shouldRunToday = true;
+                        logger.trace("Task will run today");
                     } else if (l - now > 0) {
                         nextRunTime = l;
                         break;
                     }
+                }
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Next run time for task {}: {}", task.getContext(), nextRunTime > 0 ? new Date(nextRunTime) : "Unknown");
                 }
                 if (nextRunTime > 0) {
                     properties.put(ICalTask.PROP_NEXT_RUN_TIME, nextRunTime);
@@ -291,7 +298,10 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
 
     @Override
     public void onCreateTask(TaskContext ctx) {
-        onCreateTask(taskManager.getTask(ctx), System.currentTimeMillis());
+        HobsonTask task = taskManager.getTask(ctx);
+        if (task != null && task.isEnabled()) {
+            onCreateTask(task, System.currentTimeMillis());
+        }
     }
 
     protected ICalTask onCreateTask(HobsonTask task, long startOfDay) {
@@ -311,7 +321,9 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
 
         for (TaskContext ctx : tasks) {
             HobsonTask task = taskManager.getTask(ctx);
-            results.add(onCreateTask(task, startOfDay));
+            if (task.isEnabled()) {
+                results.add(onCreateTask(task, startOfDay));
+            }
         }
 
         return results;
@@ -319,16 +331,32 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
 
     @Override
     public void onUpdateTask(TaskContext ctx) {
-        // TODO
+        logger.trace("Detected update for task {}", ctx);
+        HobsonTask task = taskManager.getTask(ctx);
+        if (task != null) {
+            onDeleteTask(ctx, false);
+            if (task.isEnabled()) {
+                logger.trace("Task is enabled so re-adding");
+                long now = System.currentTimeMillis();
+                onCreateTask(task, now);
+            } else {
+                fireNotScheduled(ctx);
+            }
+        }
     }
 
     @Override
     public void onDeleteTask(TaskContext ctx) {
+        onDeleteTask(ctx, true);
+    }
+
+    private void onDeleteTask(TaskContext ctx, boolean fireUpdate) {
         // first cancel the task if it is queued to run
         try {
             taskQueue.cancel(ctx);
+            logger.debug("Removed task {} from task queue", ctx);
         } catch (TaskNotFoundException e) {
-            logger.debug("Unable to find task to cancel; ignoring", e);
+            logger.debug("Unable to find task {} to cancel; ignoring", ctx);
         }
 
         // then remove it from the calendar
@@ -336,13 +364,24 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
         for (Object e : calendar.getComponents()) {
             if (e instanceof VEvent) {
                 if (((VEvent)e).getUid().getValue().equals(ctx.getTaskId())) {
-                    logger.debug("Deleting task: {}", ctx);
                     c = (Component)e;
                 }
             }
         }
         if (c != null) {
+            logger.debug("Removing task from calendar: {}", ctx);
             calendar.getComponents().remove(c);
         }
+
+        if (fireUpdate) {
+            fireNotScheduled(ctx);
+        }
+    }
+
+    private void fireNotScheduled(TaskContext ctx) {
+        Map<String, Object> properties = new HashMap<>();
+        properties.put(ICalTask.PROP_SCHEDULED, false);
+        properties.put(ICalTask.PROP_NEXT_RUN_TIME, 0);
+        taskManager.updateTaskProperties(ctx, properties);
     }
 }
