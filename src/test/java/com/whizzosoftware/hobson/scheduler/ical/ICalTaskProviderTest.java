@@ -1,26 +1,25 @@
-/*******************************************************************************
+/*
+ *******************************************************************************
  * Copyright (c) 2014 Whizzo Software, LLC.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- *******************************************************************************/
+ *******************************************************************************
+*/
 package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.api.hub.HubContext;
 import com.whizzosoftware.hobson.api.plugin.PluginContext;
 import com.whizzosoftware.hobson.api.property.PropertyContainer;
 import com.whizzosoftware.hobson.api.property.PropertyContainerClassContext;
-import com.whizzosoftware.hobson.api.property.TypedProperty;
 import com.whizzosoftware.hobson.api.task.HobsonTask;
 import com.whizzosoftware.hobson.api.task.MockTaskManager;
 import com.whizzosoftware.hobson.api.task.TaskContext;
-import com.whizzosoftware.hobson.api.task.condition.ConditionClassType;
-import com.whizzosoftware.hobson.api.task.condition.ConditionEvaluationContext;
 import com.whizzosoftware.hobson.api.task.condition.TaskConditionClass;
+import com.whizzosoftware.hobson.scheduler.condition.ScheduleConditionClass;
 import com.whizzosoftware.hobson.scheduler.queue.MockTaskQueue;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
-import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.junit.Test;
 import static org.junit.Assert.*;
@@ -39,22 +38,11 @@ public class ICalTaskProviderTest {
     }
 
     @Test
-    public void testLoadTaskWithNoExecutor() {
-        MockTaskManager taskManager = new MockTaskManager();
-        ICalTaskProvider provider = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
-        provider.setTaskManager(taskManager);
-        try {
-            provider.onRegisterTasks(Collections.singletonList(TaskContext.createLocal("task1")));
-            fail("Should have thrown an exception");
-        } catch (Exception ignored) {}
-    }
-
-    @Test
     public void testClearAllTasks() throws Exception {
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(PluginContext.createLocal("plugin1"), "schedule");
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
 
         DateTimeZone tz = DateTimeZone.forID("GMT");
-        MockTaskManager mgr = createMockTaskManager(pccc);
+        MockTaskManager mgr = createMockTaskManager(scc);
         MockTaskQueue executor = new MockTaskQueue();
 
         // make sure executor has no delays already set
@@ -62,8 +50,8 @@ public class ICalTaskProviderTest {
 
         long startOfDay = DateHelper.getTime(2013, 7, 14, 0, 0, 0, tz);
 
-        HobsonTask task = createScheduleTask(mgr, pccc, "20130714", "170000Z", null);
-        ICalTaskProvider s = new ICalTaskProvider(pccc.getPluginContext(), null, null, tz);
+        HobsonTask task = createScheduleTask(mgr, scc.getContext(), "20130714", "170000Z", null);
+        ICalTaskProvider s = new ICalTaskProvider(scc.getContext().getPluginContext(), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
         s.onCreateTasks(Collections.singletonList(task.getContext()), startOfDay);
@@ -79,11 +67,11 @@ public class ICalTaskProviderTest {
 
     @Test
     public void testLoadScheduleWithSingleEvent() throws Exception {
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(PluginContext.createLocal("plugin1"), "schedule");
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
         DateTimeZone tz = DateTimeZone.forID("GMT");
-        MockTaskManager manager = createMockTaskManager(pccc);
+        MockTaskManager manager = createMockTaskManager(scc);
 
-        HobsonTask task = createScheduleTask(manager, pccc, "20130714", "170000Z", null);
+        HobsonTask task = createScheduleTask(manager, scc.getContext(), "20130714", "170000Z", null);
 
         // assert what happens the day OF the event
         long startOfDay = DateHelper.getTime(2013, 7, 14, 0, 0, 0, tz);
@@ -206,10 +194,10 @@ public class ICalTaskProviderTest {
     @Test
     public void testLoadScheduleWithSingleEventWithSunsetOffset() throws Exception {
         DateTimeZone tz = DateTimeZone.forID("America/Denver");
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(PluginContext.createLocal("plugin1"), "schedule");
-        MockTaskManager mgr = createMockTaskManager(pccc);
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
+        MockTaskManager mgr = createMockTaskManager(scc);
 
-        HobsonTask task = createScheduleTask(mgr, pccc, "20141018", "SS30", null);
+        HobsonTask task = createScheduleTask(mgr, scc.getContext(), "20141018", "SS30", null);
 
 
         long startOfDay = DateHelper.getTime(2014, 10, 18, 0, 0, 0, tz);
@@ -232,15 +220,16 @@ public class ICalTaskProviderTest {
     @Test
     public void testDayReset() throws Exception {
         DateTimeZone tz = DateTimeZone.forID("GMT");
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(PluginContext.createLocal("plugin1"), "schedule");
-        MockTaskManager mgr = createMockTaskManager(pccc);
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
+
+        MockTaskManager mgr = createMockTaskManager(scc);
         MockTaskQueue executor = new MockTaskQueue();
 
-        HobsonTask task = createScheduleTask(mgr, pccc, "20140701", "090000Z", "FREQ=DAILY");
+        HobsonTask task = createScheduleTask(mgr, scc.getContext(), "20140701", "090000Z", "FREQ=DAILY");
 
         long schedulerStart = DateHelper.getTime(2014, 7, 1, 8, 0, 0, tz);
 
-        ICalTaskProvider s = new ICalTaskProvider(pccc.getPluginContext(), null, null, tz);
+        ICalTaskProvider s = new ICalTaskProvider(scc.getContext().getPluginContext(), null, null, tz);
         s.setTaskManager(mgr);
         s.setScheduleExecutor(executor);
         s.onCreateTasks(Collections.singletonList(task.getContext()), schedulerStart);
@@ -258,10 +247,10 @@ public class ICalTaskProviderTest {
     @Test
     public void testDelayedDayReset() throws Exception {
         DateTimeZone tz = DateTimeZone.forID("GMT");
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(PluginContext.createLocal("plugin1"), "schedule");
-        MockTaskManager mgr = createMockTaskManager(pccc);
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
+        MockTaskManager mgr = createMockTaskManager(scc);
 
-        HobsonTask task = createScheduleTask(mgr, pccc, "20140701", "000000Z", "FREQ=DAILY");
+        HobsonTask task = createScheduleTask(mgr, scc.getContext(), "20140701", "000000Z", "FREQ=DAILY");
 
         // start the scheduler after the task should have run
         MockTaskQueue executor = new MockTaskQueue();
@@ -291,10 +280,10 @@ public class ICalTaskProviderTest {
     @Test
     public void testDayResetWithSolarOffsetTask() throws Exception {
         DateTimeZone tz = DateTimeZone.forID("America/Denver");
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(PluginContext.createLocal("plugin1"), "schedule");
-        MockTaskManager mgr = createMockTaskManager(pccc);
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
+        MockTaskManager mgr = createMockTaskManager(scc);
 
-        HobsonTask task = createScheduleTask(mgr, pccc, "20140701", "SS30", "FREQ=DAILY");
+        HobsonTask task = createScheduleTask(mgr, scc.getContext(), "20140701", "SS30", "FREQ=DAILY");
 
         // start the scheduler after the task should have run
         MockTaskQueue executor = new MockTaskQueue();
@@ -326,10 +315,10 @@ public class ICalTaskProviderTest {
     @Test
     public void testMonthlyNextRun() throws Exception {
         DateTimeZone tz = DateTimeZone.forID("GMT");
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(PluginContext.createLocal("plugin1"), "schedule");
-        MockTaskManager mgr = createMockTaskManager(pccc);
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
+        MockTaskManager mgr = createMockTaskManager(scc);
 
-        HobsonTask task = createScheduleTask(mgr, pccc, "20140701", "220000Z", "FREQ=MONTHLY");
+        HobsonTask task = createScheduleTask(mgr, scc.getContext(), "20140701", "220000Z", "FREQ=MONTHLY");
 
         // start the scheduler when the task should have run
         MockTaskQueue executor = new MockTaskQueue();
@@ -346,10 +335,10 @@ public class ICalTaskProviderTest {
     @Test
     public void testYearlyNextRun() throws Exception {
         DateTimeZone tz = DateTimeZone.forID("GMT");
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(PluginContext.createLocal("plugin1"), "schedule");
-        MockTaskManager mgr = createMockTaskManager(pccc);
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
+        MockTaskManager mgr = createMockTaskManager(scc);
 
-        HobsonTask task = createScheduleTask(mgr, pccc, "20140701", "220000Z", "FREQ=YEARLY");
+        HobsonTask task = createScheduleTask(mgr, scc.getContext(), "20140701", "220000Z", "FREQ=YEARLY");
 
         // start the scheduler when the task should have run
         MockTaskQueue executor = new MockTaskQueue();
@@ -366,10 +355,10 @@ public class ICalTaskProviderTest {
     @Test
     public void testTaskRescheduling() throws Exception {
         DateTimeZone tz = DateTimeZone.forID("GMT");
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(PluginContext.createLocal("plugin1"), "schedule");
-        MockTaskManager mgr = createMockTaskManager(pccc);
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
+        MockTaskManager mgr = createMockTaskManager(scc);
 
-        HobsonTask task = createScheduleTask(mgr, pccc, "20140701", "100000Z", "FREQ=MINUTELY;INTERVAL=1");
+        HobsonTask task = createScheduleTask(mgr, scc.getContext(), "20140701", "100000Z", "FREQ=MINUTELY;INTERVAL=1");
 
         MockTaskQueue executor = new MockTaskQueue();
         ICalTaskProvider scheduler = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null, tz);
@@ -397,10 +386,10 @@ public class ICalTaskProviderTest {
     @Test
     public void testSunOffsetWithNoLatLong() throws Exception {
         DateTimeZone tz = DateTimeZone.getDefault();
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(PluginContext.createLocal("plugin1"), "schedule");
-        MockTaskManager mgr = createMockTaskManager(pccc);
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
+        MockTaskManager mgr = createMockTaskManager(scc);
 
-        HobsonTask task = createScheduleTask(mgr, pccc, "20140701", "SS30", "FREQ=DAILY");
+        HobsonTask task = createScheduleTask(mgr, scc.getContext(), "20140701", "SS30", "FREQ=DAILY");
 
         // start the scheduler after the task should have run
         MockTaskQueue executor = new MockTaskQueue();
@@ -413,24 +402,9 @@ public class ICalTaskProviderTest {
         assertTrue(task.getProperties().containsKey(ICalTask.PROP_ERROR));
     }
 
-    private MockTaskManager createMockTaskManager(PropertyContainerClassContext pccc) {
+    private MockTaskManager createMockTaskManager(TaskConditionClass pcc) {
         MockTaskManager mgr = new MockTaskManager();
-        mgr.publishConditionClass(new TaskConditionClass(pccc, "schedule", "") {
-            @Override
-            public ConditionClassType getConditionClassType() {
-                return ConditionClassType.trigger;
-            }
-
-            @Override
-            public List<TypedProperty> createProperties() {
-                return null;
-            }
-
-            @Override
-            public boolean evaluate(ConditionEvaluationContext context, PropertyContainer values) {
-                return true;
-            }
-        });
+        mgr.publishConditionClass(pcc);
         return mgr;
     }
 

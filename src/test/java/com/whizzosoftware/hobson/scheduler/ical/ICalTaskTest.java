@@ -1,23 +1,21 @@
-/*******************************************************************************
+/*
+ *******************************************************************************
  * Copyright (c) 2014 Whizzo Software, LLC.
  * All rights reserved. This program and the accompanying materials
  * are made available under the terms of the Eclipse Public License v1.0
  * which accompanies this distribution, and is available at
  * http://www.eclipse.org/legal/epl-v10.html
- *******************************************************************************/
+ *******************************************************************************
+*/
 package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.api.hub.HubContext;
 import com.whizzosoftware.hobson.api.plugin.PluginContext;
 import com.whizzosoftware.hobson.api.property.PropertyContainer;
-import com.whizzosoftware.hobson.api.property.PropertyContainerClassContext;
 import com.whizzosoftware.hobson.api.property.PropertyContainerSet;
-import com.whizzosoftware.hobson.api.property.TypedProperty;
 import com.whizzosoftware.hobson.api.task.MockTaskManager;
-import com.whizzosoftware.hobson.api.task.condition.ConditionClassType;
-import com.whizzosoftware.hobson.api.task.condition.ConditionEvaluationContext;
-import com.whizzosoftware.hobson.api.task.condition.TaskConditionClass;
 import com.whizzosoftware.hobson.scheduler.SchedulingException;
+import com.whizzosoftware.hobson.scheduler.condition.ScheduleConditionClass;
 import com.whizzosoftware.hobson.scheduler.queue.MockTaskQueue;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
 import net.fortuna.ical4j.model.Calendar;
@@ -130,23 +128,8 @@ public class ICalTaskTest {
     public void testJSONRuleConstruction() throws Exception {
         PluginContext pctx = PluginContext.createLocal("pluginId");
         MockTaskManager taskManager = new MockTaskManager();
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(pctx, "foo");
-        taskManager.publishConditionClass(new TaskConditionClass(pccc, "foo", "") {
-            @Override
-            public ConditionClassType getConditionClassType() {
-                return ConditionClassType.trigger;
-            }
-
-            @Override
-            public List<TypedProperty> createProperties() {
-                return null;
-            }
-
-            @Override
-            public boolean evaluate(ConditionEvaluationContext context, PropertyContainer values) {
-                return false;
-            }
-        });
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
+        taskManager.publishConditionClass(scc);
         ICalTaskProvider provider = new ICalTaskProvider(pctx, null, null);
         provider.setTaskManager(taskManager);
         provider.setScheduleExecutor(new MockTaskQueue());
@@ -155,7 +138,7 @@ public class ICalTaskTest {
         props.put("date", "2014-07-01");
         props.put("time", "10:00:00Z");
         props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
-        taskManager.createTask(HubContext.createLocal(), "My Task", null, Collections.singletonList(new PropertyContainer(pccc, props)), new PropertyContainerSet("foo", null));
+        taskManager.createTask(HubContext.createLocal(), "My Task", null, Collections.singletonList(new PropertyContainer(scc.getContext(), props)), new PropertyContainerSet("foo", null));
         provider.onRegisterTasks(Collections.singletonList(taskManager.getTasks(HubContext.createLocal()).iterator().next().getContext()));
 
         // make sure the provider updated the rule file
@@ -174,25 +157,10 @@ public class ICalTaskTest {
     @Test
     public void testJSONRuleConstructionWithNeverRecurrence() throws Exception {
         PluginContext pctx = PluginContext.createLocal("pluginId");
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(pctx, "foo");
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
 
         MockTaskManager taskManager = new MockTaskManager();
-        taskManager.publishConditionClass(new TaskConditionClass(pccc, "", "") {
-            @Override
-            public ConditionClassType getConditionClassType() {
-                return ConditionClassType.trigger;
-            }
-
-            @Override
-            public List<TypedProperty> createProperties() {
-                return null;
-            }
-
-            @Override
-            public boolean evaluate(ConditionEvaluationContext context, PropertyContainer values) {
-                return false;
-            }
-        });
+        taskManager.publishConditionClass(scc);
 
         ICalTaskProvider provider = new ICalTaskProvider(PluginContext.createLocal("pluginId"), null, null);
         provider.setScheduleExecutor(new MockTaskQueue());
@@ -202,7 +170,7 @@ public class ICalTaskTest {
         props.put("date", "2014-07-01");
         props.put("time", "10:00:00Z");
         props.put("recurrence", "never");
-        taskManager.createTask(HubContext.createLocal(), "My Task", null, Collections.singletonList(new PropertyContainer(pccc, props)), new PropertyContainerSet("foo", null));
+        taskManager.createTask(HubContext.createLocal(), "My Task", null, Collections.singletonList(new PropertyContainer(scc.getContext(), props)), new PropertyContainerSet("foo", null));
 
         provider.onRegisterTasks(Collections.singletonList(taskManager.getTasks(HubContext.createLocal()).iterator().next().getContext()));
 
@@ -222,25 +190,10 @@ public class ICalTaskTest {
     @Test
     public void testJSONRuleConstructionWithSunOffset() throws Exception {
         PluginContext pctx = PluginContext.createLocal("plugin1");
-        PropertyContainerClassContext pccc = PropertyContainerClassContext.create(pctx, "foo");
+        ScheduleConditionClass scc = new ScheduleConditionClass(PluginContext.createLocal("plugin1"));
 
         MockTaskManager taskManager = new MockTaskManager();
-        taskManager.publishConditionClass(new TaskConditionClass(pccc, "foo", "") {
-            @Override
-            public ConditionClassType getConditionClassType() {
-                return ConditionClassType.trigger;
-            }
-
-            @Override
-            public List<TypedProperty> createProperties() {
-                return null;
-            }
-
-            @Override
-            public boolean evaluate(ConditionEvaluationContext context, PropertyContainer values) {
-                return false;
-            }
-        });
+        taskManager.publishConditionClass(scc);
 
         ICalTaskProvider provider = new ICalTaskProvider(pctx, null, null);
         provider.setScheduleExecutor(new MockTaskQueue());
@@ -250,7 +203,7 @@ public class ICalTaskTest {
         props.put("date", "2014-07-01");
         props.put("time", "SR");
         props.put("recurrence", "FREQ=MINUTELY;INTERVAL=1");
-        taskManager.createTask(HubContext.createLocal(), "My Task", null, Collections.singletonList(new PropertyContainer(pccc, props)), new PropertyContainerSet("foo", null));
+        taskManager.createTask(HubContext.createLocal(), "My Task", null, Collections.singletonList(new PropertyContainer(scc.getContext(), props)), new PropertyContainerSet("foo", null));
         provider.onRegisterTasks(Collections.singletonList(taskManager.getTasks(HubContext.createLocal()).iterator().next().getContext()));
 
         // make sure the provider updated the rule file

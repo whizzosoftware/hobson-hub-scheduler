@@ -11,10 +11,13 @@ package com.whizzosoftware.hobson.scheduler.ical;
 
 import com.whizzosoftware.hobson.api.HobsonRuntimeException;
 import com.whizzosoftware.hobson.api.plugin.PluginContext;
+import com.whizzosoftware.hobson.api.property.PropertyContainer;
 import com.whizzosoftware.hobson.api.task.*;
+import com.whizzosoftware.hobson.api.task.condition.TaskConditionClass;
 import com.whizzosoftware.hobson.scheduler.DayResetListener;
 import com.whizzosoftware.hobson.scheduler.SchedulingException;
 import com.whizzosoftware.hobson.scheduler.TaskNotFoundException;
+import com.whizzosoftware.hobson.scheduler.condition.ScheduleConditionClass;
 import com.whizzosoftware.hobson.scheduler.condition.TriggerConditionListener;
 import com.whizzosoftware.hobson.scheduler.queue.TaskQueue;
 import com.whizzosoftware.hobson.scheduler.util.DateHelper;
@@ -56,7 +59,7 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
         this(pluginContext, latitude, longitude, DateTimeZone.getDefault());
     }
 
-    public ICalTaskProvider(PluginContext pluginContext, Double latitude, Double longitude, DateTimeZone timeZone) {
+    ICalTaskProvider(PluginContext pluginContext, Double latitude, Double longitude, DateTimeZone timeZone) {
         this.pluginContext = pluginContext;
         this.latitude = latitude;
         this.longitude = longitude;
@@ -71,19 +74,7 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
         this.dayResetListener = dayResetListener;
     }
 
-    public PluginContext getPluginContext() {
-        return pluginContext;
-    }
-
-    public Double getLatitude() {
-        return latitude;
-    }
-
-    public Double getLongitude() {
-        return longitude;
-    }
-
-    public Calendar getCalendar() {
+    Calendar getCalendar() {
         return calendar;
     }
 
@@ -108,7 +99,7 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
      *
      * @throws Exception on failure
      */
-    protected boolean addTask(ICalTask task, long now, boolean wasDayReset) throws Exception {
+    private boolean addTask(ICalTask task, long now, boolean wasDayReset) throws Exception {
         logger.trace("Adding task: {}", task.getContext());
         return scheduleNextRun(task, now, wasDayReset);
     }
@@ -124,7 +115,7 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
      *
      * @throws Exception on failure
      */
-    protected boolean scheduleNextRun(ICalTask task, long now, boolean wasDayReset) throws Exception {
+    private boolean scheduleNextRun(ICalTask task, long now, boolean wasDayReset) throws Exception {
         logger.trace("Attempting to schedule next run of task: {}", task.getContext());
 
         if (taskQueue == null) {
@@ -140,13 +131,13 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
 
         try {
             // check if there is more than 1 run in the next two days
-            List<Long> todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 86400000l, timeZone);
+            List<Long> todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 86400000L, timeZone);
             // if not, check if there is more than 1 run in the next 6 weeks
             if (todaysRunTimes.size() < 2) {
-                todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 3628800000l, timeZone);
+                todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 3628800000L, timeZone);
                 // it not, check if there is more than 1 run in the next 53 weeks
                 if (todaysRunTimes.size() < 2) {
-                    todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 32054400000l, timeZone);
+                    todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 32054400000L, timeZone);
                 }
             }
 
@@ -203,7 +194,7 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
         taskQueue = null;
     }
 
-    public void resetForNewDay(long now) {
+    void resetForNewDay(long now) {
         logger.debug("Resetting for new day at {}", new DateTime(now));
 
         // alert listener
@@ -246,7 +237,7 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
      * @param now the current time
      * @param forceCheck post-process regardless of running state?
      */
-    protected void onTaskExecuted(ICalTask task, long now, boolean forceCheck) {
+    void onTaskExecuted(ICalTask task, long now, boolean forceCheck) {
         // notify task manager that the trigger condition has fired
         if (taskManager != null) {
             taskManager.fireTaskTrigger(task.getContext());
@@ -266,12 +257,12 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
         }
     }
 
-    synchronized protected void clearAllTasks() {
+    synchronized void clearAllTasks() {
         logger.debug("Clearing all tasks");
         taskQueue.cancelAll();
     }
 
-    synchronized protected void refreshLocalCalendarData(long now, boolean wasDayReset) throws Exception {
+    synchronized private void refreshLocalCalendarData(long now, boolean wasDayReset) throws Exception {
         if (taskQueue == null) {
             throw new Exception("Can't load a schedule without a configured executor");
         }
@@ -293,18 +284,11 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
 
     @Override
     public void onRegisterTasks(Collection<TaskContext> tasks) {
+        logger.trace("Detected tasks registration: {}", tasks);
         onCreateTasks(tasks, System.currentTimeMillis());
     }
 
-    @Override
-    public void onCreateTask(TaskContext ctx) {
-        HobsonTask task = taskManager.getTask(ctx);
-        if (task != null && task.isEnabled()) {
-            onCreateTask(task, System.currentTimeMillis());
-        }
-    }
-
-    protected ICalTask onCreateTask(HobsonTask task, long startOfDay) {
+    private ICalTask onCreateTask(HobsonTask task, long startOfDay) {
         try {
             ICalTask ict = new ICalTask(task.getContext(), TaskHelper.getTriggerCondition(taskManager, task.getConditions()));
             ict.setLocation(latitude, longitude);
@@ -316,12 +300,12 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
         }
     }
 
-    protected List<ICalTask> onCreateTasks(Collection<TaskContext> tasks, long startOfDay) {
+    List<ICalTask> onCreateTasks(Collection<TaskContext> tasks, long startOfDay) {
         List<ICalTask> results = new ArrayList<>();
 
         for (TaskContext ctx : tasks) {
             HobsonTask task = taskManager.getTask(ctx);
-            if (task.isEnabled()) {
+            if (task != null && task.isEnabled() && doesOwnTask(task)) {
                 results.add(onCreateTask(task, startOfDay));
             }
         }
@@ -333,30 +317,29 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
     public void onUpdateTask(TaskContext ctx) {
         logger.trace("Detected update for task {}", ctx);
         HobsonTask task = taskManager.getTask(ctx);
-        if (task != null) {
-            onDeleteTask(ctx, false);
+        if (task != null && doesOwnTask(task)) {
+            onDeleteTask(ctx);
             if (task.isEnabled()) {
                 logger.trace("Task is enabled so re-adding");
                 long now = System.currentTimeMillis();
                 onCreateTask(task, now);
             } else {
-                fireNotScheduled(ctx);
+                Map<String, Object> properties = new HashMap<>();
+                properties.put(ICalTask.PROP_SCHEDULED, false);
+                properties.put(ICalTask.PROP_NEXT_RUN_TIME, 0);
+                taskManager.updateTaskProperties(ctx, properties);
             }
         }
     }
 
     @Override
     public void onDeleteTask(TaskContext ctx) {
-        onDeleteTask(ctx, true);
-    }
-
-    private void onDeleteTask(TaskContext ctx, boolean fireUpdate) {
         // first cancel the task if it is queued to run
         try {
             taskQueue.cancel(ctx);
             logger.debug("Removed task {} from task queue", ctx);
         } catch (TaskNotFoundException e) {
-            logger.debug("Unable to find task {} to cancel; ignoring", ctx);
+            logger.trace("Unable to find task {} to cancel; ignoring", ctx);
         }
 
         // then remove it from the calendar
@@ -371,17 +354,19 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
         if (c != null) {
             logger.debug("Removing task from calendar: {}", ctx);
             calendar.getComponents().remove(c);
-        }
-
-        if (fireUpdate) {
-            fireNotScheduled(ctx);
+        } else {
+            logger.trace("Unable to find task {} to remove; ignoring", ctx);
         }
     }
 
-    private void fireNotScheduled(TaskContext ctx) {
-        Map<String, Object> properties = new HashMap<>();
-        properties.put(ICalTask.PROP_SCHEDULED, false);
-        properties.put(ICalTask.PROP_NEXT_RUN_TIME, 0);
-        taskManager.updateTaskProperties(ctx, properties);
+    private boolean doesOwnTask(HobsonTask task) {
+        PropertyContainer triggerCondition = TaskHelper.getTriggerCondition(taskManager, task.getConditions());
+        if (triggerCondition != null) {
+            TaskConditionClass tcc = taskManager.getConditionClass(triggerCondition.getContainerClassContext());
+            if (tcc != null) {
+                return (tcc instanceof ScheduleConditionClass);
+            }
+        }
+        return false;
     }
 }
