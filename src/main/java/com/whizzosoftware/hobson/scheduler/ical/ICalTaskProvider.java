@@ -167,7 +167,7 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
             properties.put(ICalTask.PROP_ERROR, e.getLocalizedMessage());
         }
 
-        taskManager.updateTaskProperties(task.getContext(), properties);
+        taskManager.updateTaskProperties(pluginContext, task.getContext(), properties);
 
         return shouldRunToday;
     }
@@ -327,7 +327,7 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
                 Map<String, Object> properties = new HashMap<>();
                 properties.put(ICalTask.PROP_SCHEDULED, false);
                 properties.put(ICalTask.PROP_NEXT_RUN_TIME, 0);
-                taskManager.updateTaskProperties(ctx, properties);
+                taskManager.updateTaskProperties(pluginContext, ctx, properties);
             }
         }
     }
