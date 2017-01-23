@@ -89,6 +89,10 @@ public class SchedulerPlugin extends AbstractHobsonPlugin implements DayResetLis
     }
 
     @Override
+    public void onPluginConfigurationUpdate(PropertyContainer config) {
+    }
+
+    @Override
     protected TypedProperty[] getConfigurationPropertyTypes() {
         return null;
     }
