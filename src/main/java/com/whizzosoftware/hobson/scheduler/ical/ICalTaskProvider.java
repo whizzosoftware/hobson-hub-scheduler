@@ -127,6 +127,8 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
         boolean shouldRunToday = false;
         Map<String,Object> properties = new HashMap<>();
 
+        logger.trace("Start of today is {}; end of today is {}", startOfToday, endOfToday);
+
         properties.put(ICalTask.PROP_SCHEDULED, false);
 
         try {
@@ -134,9 +136,11 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
             List<Long> todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 86400000L, timeZone);
             // if not, check if there is more than 1 run in the next 6 weeks
             if (todaysRunTimes.size() < 2) {
+                logger.trace("Found less than 2 run times over next two days; re-calculating in next 6 weeks");
                 todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 3628800000L, timeZone);
                 // it not, check if there is more than 1 run in the next 53 weeks
                 if (todaysRunTimes.size() < 2) {
+                    logger.trace("Found less than 2 run times over next 6 weeks; re-calculating in next 53 weeks");
                     todaysRunTimes = task.getRunsDuringInterval(startOfToday, startOfToday + 32054400000L, timeZone);
                 }
             }
@@ -149,6 +153,7 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
                         logger.trace("Task will run today");
                     } else if (l - now > 0) {
                         nextRunTime = l;
+                        logger.trace("Setting next run time to {}", nextRunTime);
                         break;
                     }
                 }
@@ -161,9 +166,14 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
                         properties.put(ICalTask.PROP_SCHEDULED, true);
                         taskQueue.schedule(task.getContext(), nextRunTime - now);
                     }
+                } else {
+                    logger.trace("Next run time is not > 0; not scheduled");
                 }
+            } else {
+                logger.trace("Didn't find any run times for today");
             }
         } catch (SchedulingException e) {
+            logger.error("A scheduling exception occurred", e);
             properties.put(ICalTask.PROP_ERROR, e.getLocalizedMessage());
         }
 
@@ -195,7 +205,7 @@ public class ICalTaskProvider implements TaskProvider, TriggerConditionListener 
     }
 
     void resetForNewDay(long now) {
-        logger.debug("Resetting for new day at {}", new DateTime(now));
+        logger.debug("Resetting for new day at {} ({})", new DateTime(now), now);
 
         // alert listener
         if (dayResetListener != null) {
